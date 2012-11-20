@@ -39,8 +39,8 @@
  *         Simon Barner <barner@in.tum.de
  */
 
-#ifndef __RS232_ATMEGA256__
-#define __RS232_ATMEGA256__
+#ifndef __RS232_ATMEGA2560__
+#define __RS232_ATMEGA2560__
 /******************************************************************************/
 /***   Includes                                                               */
 /******************************************************************************/
@@ -51,6 +51,7 @@
 /******************************************************************************/
 #define RS232_PORT_0 0
 #define RS232_PORT_1 1
+
 
 /******************************************************************************/
 /***   Baud rates                                                             */
@@ -119,36 +120,38 @@
 #define USART_BAUD_250000 1
 #define USART_BAUD_500000 0
 #else
-#error "Please define the baud rates for your CPU clock: ATmega256 handbook p. \
+#error "Please define the baud rates for your CPU clock: ATmega128 handbook p. \
 195-198 or set the rate in contiki-conf.h"
 #endif
+
+
 
 
 /******************************************************************************/
 /***   Interrupt settings                                                     */
 /******************************************************************************/
-#define USART_INTERRUPT_RX_COMPLETE _BV (RXCIE)
-#define USART_INTERRUPT_TX_COMPLETE _BV (TXCIE)
-#define USART_INTERRUPT_DATA_REG_EMPTY _BV (UDRIE)
+#define USART_INTERRUPT_RX_COMPLETE _BV (RXCIE1)
+#define USART_INTERRUPT_TX_COMPLETE _BV (TXCIE1)
+#define USART_INTERRUPT_DATA_REG_EMPTY _BV (UDRIE1)
 
 /******************************************************************************/
 /***   Receiver / transmitter                                                 */
 /******************************************************************************/
-#define USART_RECEIVER_ENABLE _BV (RXEN)
-#define USART_TRANSMITTER_ENABLE _BV (TXEN)
+#define USART_RECEIVER_ENABLE _BV (RXEN1)
+#define USART_TRANSMITTER_ENABLE _BV (TXEN1)
 
 /******************************************************************************/
 /***   Mode select                                                            */
 /******************************************************************************/
 #define USART_MODE_ASYNC 0x00
-#define USART_MODE_SYNC _BV (UMSEL)
+#define USART_MODE_SYNC _BV (UMSEL00)
 
 /******************************************************************************/
 /***   Parity                                                                 */
 /******************************************************************************/
 #define USART_PARITY_NONE 0x00
-#define USART_PARITY_EVEN _BV (UPM1)
-#define USART_PARITY_ODD  _BV (UPM1) | _BV (UPM0)
+#define USART_PARITY_EVEN _BV (UPM01)
+#define USART_PARITY_ODD  _BV (UPM01) | _BV (UPM00)
 
 /******************************************************************************/
 /***   Stop bits                                                              */
@@ -160,15 +163,15 @@
 /***   Character size                                                         */
 /******************************************************************************/
 #define USART_DATA_BITS_5 0x00
-#define USART_DATA_BITS_6 _BV (UCSZ0)
-#define USART_DATA_BITS_7 _BV (UCSZ1)
-#define USART_DATA_BITS_8 _BV (UCSZ1) | _BV (UCSZ0)
+#define USART_DATA_BITS_6 _BV (UCSZ10)
+#define USART_DATA_BITS_7 _BV (UCSZ11)
+#define USART_DATA_BITS_8 _BV (UCSZ11) | _BV (UCSZ10)
 // #define USART_DATA_BITS_9 (needs also UCSZ2 bit in UCSRnB)
 
 /******************************************************************************/
 /***   Clock polarity                                                         */
 /******************************************************************************/
 #define USART_RISING_XCKN_EDGE 0x00
-#define USART_FALLING_XCKN_EDGE _BV (UCPOL)
+#define USART_FALLING_XCKN_EDGE _BV (UCPOL0)
 
 #endif /* #ifndef __RS232_ATMEGA128__ */
