@@ -12,3 +12,4 @@ Makefile.target
 doc/html
 patches-*
 tools/tunslip6
+.DS_Store
