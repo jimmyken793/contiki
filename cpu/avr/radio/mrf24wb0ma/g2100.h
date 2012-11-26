@@ -410,7 +410,7 @@ typedef struct
 } zg_connect_req_t;
 
 #define ZG_CONNECT_REQ_SIZE			(38)
-
+void set_ssid(char* new_ssid);
 void zg_init();
 void zg_reset();
 void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs);
@@ -425,6 +425,7 @@ U16 zg_get_rx_status();
 void zg_clear_rx_status();
 void zg_set_tx_status(U8 status);
 U8 zg_get_conn_state();
+void zg_set_buf(U8* buf, U16 buf_len);
 U8* zg_get_mac();
 void zg_set_ssid(U8* ssid, U8 ssid_len);
 void zg_set_sec(U8 sec_type, U8* sec_key, U8 sec_key_len);

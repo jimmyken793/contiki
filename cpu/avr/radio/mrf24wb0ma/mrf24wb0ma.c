@@ -85,7 +85,7 @@ typedef enum{
     TIME_STATE_TRANSITION_PLL_ACTIVE = 1,   /**<  Transition time from PLL active state to another. */
 }radio_trx_timing_t;
 /*---------------------------------------------------------------------------*/
-PROCESS(rf230_process, "RF230 driver");
+PROCESS(mrf24wb0ma_process, "RF230 driver");
 /*---------------------------------------------------------------------------*/
 
 static int rf230_on(void);
@@ -119,15 +119,17 @@ const struct radio_driver mrf24wb0ma_driver =
 int
 rf230_init(void)
 {
+  printf_P(PSTR("init!\n"));
   uint8_t i;
-  DEBUGFLOW('i');
+  //DEBUGFLOW('i');
   /* Wait in case VCC just applied */
   delay_us(TIME_TO_ENTER_P_ON);
 
-  //attachInterrupt(2, zg_isr, LOW);
+  attachInterrupt(2, zg_isr, 0);
   /* Initialize Wifi Module */
   zg_init();
 
+  printf_P(PSTR("init done!\n"));
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -135,14 +137,22 @@ rf230_init(void)
 static int
 rf230_transmit(unsigned short payload_len)
 {
+  zg_set_tx_status(1);
   return RADIO_TX_ERR;
 }
 /*---------------------------------------------------------------------------*/
 static int
 rf230_prepare(const void *payload, unsigned short payload_len)
 {
+  printf("preparing data %d", payload_len);
   int ret = 0;
-
+  // if (payload_len > 0) {
+  //   if(payload_len <= UIP_LLH_LEN + 40){
+  //   }else{
+  //     memcpy((u8*)&payload[54], (u8*)uip_appdata, (payload_len-54));
+  //     zg_set_buf(payload, payload_len);
+  //   }
+  // }
   return ret;
 }
 /*---------------------------------------------------------------------------*/
@@ -156,12 +166,15 @@ rf230_send(const void *payload, unsigned short payload_len)
 static int
 rf230_off(void)
 {
+  printf_P(PSTR("wifi turned off\n"));
   return 0;
 }
 /*---------------------------------------------------------------------------*/
 static int
 rf230_on(void)
 {
+
+  printf_P(PSTR("wifi turned on\n"));
   return 1;
 }
 
@@ -172,9 +185,7 @@ rf230_on(void)
  * rf230processflag can be printed in the main idle loop for debugging
  */
 
-#define RF230PROCESSFLAG(arg)
-
-PROCESS_THREAD(rf230_process, ev, data)
+PROCESS_THREAD(mrf24wb0ma_process, ev, data)
 {
   PROCESS_BEGIN();
 

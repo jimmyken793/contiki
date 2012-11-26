@@ -33,6 +33,7 @@
 
  *****************************************************************************/
 
+#include <stdio.h>
 #include <string.h>
 #include <avr/io.h> 
 #include "dev/spi.h"
@@ -54,10 +55,26 @@ static U16 zg_buf_len;
 
 static U8 wpa_psk_key[32];
 
+// local state 
+char ssid[33];
+U8 ssid_len;
+char security_passphrase[65];
+U8 security_passphrase_len;
+U8 security_type;
+U8 wireless_mode;
+unsigned char wep_keys[];
+
+void set_ssid(char* new_ssid){
+	strcpy(ssid, new_ssid);
+}
+
+
+
 void zg_init()
 {
 	U8 clr;
 
+	printf_P(PSTR("spi init\n"));
 	spi_init();
 	clr = SPSR;
 	clr = SPDR;
@@ -71,13 +88,15 @@ void zg_init()
 	cnf_pending = 0;
 	zg_buf_len = RADIO_BUFFER_LEN;
 
+	printf_P(PSTR("chip reset\n"));
 	zg_chip_reset();
 	zg_interrupt2_reg();
 	zg_interrupt_reg(0xff, 0);
 	zg_interrupt_reg(0x80|0x40, 1);
 
-	ssid_len = (U8)strlen_P(ssid);
-	security_passphrase_len = (U8)strlen_P(security_passphrase);
+	printf_P(PSTR("copy ssid\n"));
+	ssid_len = (U8)strlen(ssid);
+	security_passphrase_len = (U8)strlen(security_passphrase);
 }
 
 void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs)
@@ -333,8 +352,8 @@ void zg_write_wep_key(U8* cmd_buf)
 	cmd->defID = 0;		// Default key ID: Key 0, 1, 2, 3
 	cmd->ssidLen = ssid_len;
 	memset(cmd->ssid, 0x00, 32);
-	memcpy_P(cmd->ssid, ssid, ssid_len);
-	memcpy_P(cmd->key, wep_keys, ZG_MAX_ENCRYPTION_KEYS * ZG_MAX_ENCRYPTION_KEY_SIZE);
+	memcpy(cmd->ssid, ssid, ssid_len);
+	memcpy(cmd->key, wep_keys, ZG_MAX_ENCRYPTION_KEYS * ZG_MAX_ENCRYPTION_KEY_SIZE);
 
 	return;
 }
@@ -348,9 +367,9 @@ static void zg_calc_psk_key(U8* cmd_buf)
 	cmd->ssidLen = ssid_len;
 	cmd->reserved = 0;
 	memset(cmd->ssid, 0x00, 32);
-	memcpy_P(cmd->ssid, ssid, ssid_len);
+	memcpy(cmd->ssid, ssid, ssid_len);
 	memset(cmd->passPhrase, 0x00, 64);
-	memcpy_P(cmd->passPhrase, security_passphrase, security_passphrase_len);
+	memcpy(cmd->passPhrase, security_passphrase, security_passphrase_len);
 
 	return;
 }
@@ -362,7 +381,7 @@ static void zg_write_psk_key(U8* cmd_buf)
 	cmd->slot = 0;	// WPA/WPA2 PSK slot
 	cmd->ssidLen = ssid_len;
 	memset(cmd->ssid, 0x00, 32);
-	memcpy_P(cmd->ssid, ssid, cmd->ssidLen);
+	memcpy(cmd->ssid, ssid, cmd->ssidLen);
 	memcpy(cmd->keyData, wpa_psk_key, ZG_MAX_PMK_LEN);
 
 	return;
@@ -557,7 +576,7 @@ void zg_drv_process()
 
 		cmd->ssidLen = ssid_len;
 		memset(cmd->ssid, 0, 32);
-		memcpy_P(cmd->ssid, ssid, ssid_len);
+		memcpy(cmd->ssid, ssid, ssid_len);
 
 		// units of 100 milliseconds
 		cmd->sleepDuration = 0;

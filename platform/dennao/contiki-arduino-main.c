@@ -54,7 +54,7 @@
 #include "dev/slip.h"
 
 //#include "sicslowmac.h"
-
+#include "../../cpu/avr/radio/mrf24wb0ma/mrf24wb0ma.h"
 #include "platform-conf.h"
 
 #if 0
@@ -115,18 +115,47 @@ main(void)
   PORTB &= ~(1<<5);
   serial_line_init();
 
-  /* Autostart processes */
-  autostart_start(autostart_processes);
-
   printf_P(PSTR("\r\n********BOOTING CONTIKI*********\r\n"));
 
+  /* Autostart processes */
+  autostart_start(autostart_processes);
+  set_ssid("jizz");
+  netstack_init();
+  printf("MAC %s RDC %s NETWORK %s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
+  #if WITH_UIP
+  /* IPv4 CONFIGURATION */
+  {
+    uip_ipaddr_t hostaddr, netmask;
+
+    process_start(&tcpip_process, NULL);
+    process_start(&uip_fw_process, NULL);
+    process_start(&slip_process, NULL);
+
+    slip_set_input_callback(set_gateway);
+
+    uip_init();
+    uip_fw_init();
+    uip_ipaddr(&hostaddr, 172,16,rimeaddr_node_addr.u8[0],rimeaddr_node_addr.u8[1]);
+    uip_ipaddr(&netmask, 255,255,0,0);
+    uip_ipaddr_copy(&meshif.ipaddr, &hostaddr);
+
+    uip_sethostaddr(&hostaddr);
+    uip_setnetmask(&netmask);
+    uip_over_mesh_set_net(&hostaddr, &netmask);
+    uip_over_mesh_set_gateway_netif(&slipif);
+    uip_fw_default(&meshif);
+    uip_over_mesh_init(UIP_OVER_MESH_CHANNEL);
+
+    rs232_set_input(slip_input_byte);
+    printf("IPv4 address: %d.%d.%d.%d\n", uip_ipaddr_to_quad(&hostaddr));
+  }
+#endif /* WITH_UIP */
+  process_start(&mrf24wb0ma_process,NULL);
   printf_P(PSTR("System online.\r\n"));
 
   /* Main scheduler loop */
   do {
-
     process_run();
-
   } while (1);
 
   return 0;

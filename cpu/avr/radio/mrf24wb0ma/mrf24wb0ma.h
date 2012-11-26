@@ -107,6 +107,8 @@ extern uint8_t rf230_last_correlation,rf230_last_rssi,rf230_smallest_rssi;
 
 uint8_t rf230_get_raw_rssi(void);
 
+PROCESS_NAME(mrf24wb0ma_process);
+
 #define rf230_rssi	rf230_get_raw_rssi
 
 #endif
