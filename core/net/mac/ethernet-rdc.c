@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, Swedish Institute of Computer Science.
+ * Copyright (c) 2007, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,41 +32,88 @@
 
 /**
  * \file
- *         Implementation of module for automatically starting and exiting a list of processes.
+ *         A MAC protocol that does not do anything.
  * \author
  *         Adam Dunkels <adam@sics.se>
  */
 
-#include "sys/autostart.h"
-
-#define DEBUG 1
-#if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
-#else
-#define PRINTF(...)
-#endif
+#include "net/mac/ethernet-rdc.h"
+#include "net/packetbuf.h"
+#include "net/queuebuf.h"
+#include "net/netstack.h"
+#include "net/uip_arp.h"
+#include "radio/mrf24wb0ma/g2100.h"
+#include <string.h>
 
 /*---------------------------------------------------------------------------*/
-void
-autostart_start(struct process * const processes[])
+static void
+send_packet(mac_callback_t sent, void *ptr)
 {
-  int i;
-  
-  for(i = 0; processes[i] != NULL; ++i) {
-    process_start(processes[i], NULL);
-    PRINTF("autostart_start: starting process '%s'\n", processes[i]->name);
+  int ret;
+  rimeaddr_t addr;
+  wifi_getMAC((uint8_t*)&addr);
+  packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &addr);
+  if(NETSTACK_FRAMER.create() > 0) {
+    if(NETSTACK_RADIO.send(packetbuf_hdrptr(), packetbuf_totlen()) == RADIO_TX_OK) {
+      ret = MAC_TX_OK;
+    } else {
+      ret =  MAC_TX_ERR;
+    }
+    mac_call_sent_callback(sent, ptr, ret, 1);
   }
 }
 /*---------------------------------------------------------------------------*/
-void
-autostart_exit(struct process * const processes[])
+static void
+send_list(mac_callback_t sent, void *ptr, struct rdc_buf_list *buf_list)
 {
-  int i;
-  
-  for(i = 0; processes[i] != NULL; ++i) {
-    process_exit(processes[i]);
-    PRINTF("autostart_exit: stopping process '%s'\n", processes[i]->name);
+  if(buf_list != NULL) {
+    queuebuf_to_packetbuf(buf_list->buf);
+    send_packet(sent, ptr);
   }
 }
+/*---------------------------------------------------------------------------*/
+static void
+packet_input(void)
+{
+  NETSTACK_MAC.input();
+}
+/*---------------------------------------------------------------------------*/
+static int
+on(void)
+{
+  return NETSTACK_RADIO.on();
+}
+/*---------------------------------------------------------------------------*/
+static int
+off(int keep_radio_on)
+{
+  if(keep_radio_on) {
+    return NETSTACK_RADIO.on();
+  } else {
+    return NETSTACK_RADIO.off();
+  }
+}
+/*---------------------------------------------------------------------------*/
+static unsigned short
+channel_check_interval(void)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static void
+init(void)
+{
+  on();
+}
+/*---------------------------------------------------------------------------*/
+const struct rdc_driver ethernet_rdc_driver = {
+  "nullrdc-noframer",
+  init,
+  send_packet,
+  send_list,
+  packet_input,
+  on,
+  off,
+  channel_check_interval,
+};
 /*---------------------------------------------------------------------------*/

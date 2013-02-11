@@ -84,113 +84,91 @@ typedef enum{
     TIME_TRX_OFF_TO_PLL_ACTIVE       = 180, /**<  Transition time from TRX_OFF to: RX_ON, PLL_ON, TX_ARET_ON and RX_AACK_ON. */
     TIME_STATE_TRANSITION_PLL_ACTIVE = 1,   /**<  Transition time from PLL active state to another. */
 }radio_trx_timing_t;
-/*---------------------------------------------------------------------------*/
-PROCESS(mrf24wb0ma_process, "RF230 driver");
-/*---------------------------------------------------------------------------*/
 
-static int rf230_on(void);
-static int rf230_off(void);
+static int MRF24WB0MA_on(void);
+static int MRF24WB0MA_off(void);
 
-static int rf230_read(void *buf, unsigned short bufsize);
+static int MRF24WB0MA_read(void *buf, unsigned short bufsize);
 
-static int rf230_prepare(const void *data, unsigned short len);
-static int rf230_transmit(unsigned short len);
-static int rf230_send(const void *data, unsigned short len);
+static int MRF24WB0MA_prepare(const void *data, unsigned short len);
+static int MRF24WB0MA_transmit(unsigned short len);
+static int MRF24WB0MA_send(const void *data, unsigned short len);
 
-static int rf230_receiving_packet(void);
-static int rf230_pending_packet(void);
-static int rf230_cca(void);
+static int MRF24WB0MA_receiving_packet(void);
+static int MRF24WB0MA_pending_packet(void);
+static int MRF24WB0MA_cca(void);
 
 const struct radio_driver mrf24wb0ma_driver =
   {
-    rf230_init,
-    rf230_prepare,
-    rf230_transmit,
-    rf230_send,
-    rf230_read,
-    rf230_cca,
-    rf230_receiving_packet,
-    rf230_pending_packet,
-    rf230_on,
-    rf230_off
+    MRF24WB0MA_init,
+    MRF24WB0MA_prepare,
+    MRF24WB0MA_transmit,
+    MRF24WB0MA_send,
+    MRF24WB0MA_read,
+    MRF24WB0MA_cca,
+    MRF24WB0MA_receiving_packet,
+    MRF24WB0MA_pending_packet,
+    MRF24WB0MA_on,
+    MRF24WB0MA_off
   };
 
 /*---------------------------------------------------------------------------*/
-int
-rf230_init(void)
+int MRF24WB0MA_init(void)
 {
-  printf_P(PSTR("init!\n"));
-  uint8_t i;
-  //DEBUGFLOW('i');
-  /* Wait in case VCC just applied */
-  delay_us(TIME_TO_ENTER_P_ON);
 
-  attachInterrupt(2, zg_isr, 0);
+  printf_P(PSTR("MRF24WB0MA_init\n"));
   /* Initialize Wifi Module */
   zg_init();
-
-  printf_P(PSTR("init done!\n"));
+  printf_P(PSTR("MRF24WB0MA_init done!\n"));
   return 1;
 }
 /*---------------------------------------------------------------------------*/
 
-static int
-rf230_transmit(unsigned short payload_len)
+static int MRF24WB0MA_transmit(unsigned short payload_len)
 {
-  zg_set_tx_status(1);
-  return RADIO_TX_ERR;
+  printf_P(PSTR("wifi transmit\n"));
+  wifi_send();
+  return RADIO_TX_OK;
 }
 /*---------------------------------------------------------------------------*/
-static int
-rf230_prepare(const void *payload, unsigned short payload_len)
+static int MRF24WB0MA_prepare(const void *payload, unsigned short payload_len)
 {
-  printf("preparing data %d", payload_len);
+  printf("preparing data %d\n", payload_len);
+
+  {
+    int i;
+    for(i=0;i<payload_len;i++){
+     printf("%02x ", ((uint8_t*)payload)[i]);
+     if(i%20==19)
+      printf("\n");
+    }
+    printf("\n");
+  }
   int ret = 0;
-  // if (payload_len > 0) {
-  //   if(payload_len <= UIP_LLH_LEN + 40){
-  //   }else{
-  //     memcpy((u8*)&payload[54], (u8*)uip_appdata, (payload_len-54));
-  //     zg_set_buf(payload, payload_len);
-  //   }
-  // }
+  wifi_prepare_payload((char*)payload, payload_len);
   return ret;
 }
 /*---------------------------------------------------------------------------*/
-static int
-rf230_send(const void *payload, unsigned short payload_len)
+static int MRF24WB0MA_send(const void *payload, unsigned short payload_len)
 {
 	int ret = 0;
+  MRF24WB0MA_prepare(payload, payload_len);
+  MRF24WB0MA_transmit(payload_len);
 	return ret;
 }
 /*---------------------------------------------------------------------------*/
-static int
-rf230_off(void)
+static int MRF24WB0MA_off(void)
 {
-  printf_P(PSTR("wifi turned off\n"));
+  printf_P(PSTR("TODO:wifi turned off\n"));
   return 0;
 }
 /*---------------------------------------------------------------------------*/
-static int
-rf230_on(void)
+static int MRF24WB0MA_on(void)
 {
-
-  printf_P(PSTR("wifi turned on\n"));
+  printf_P(PSTR("TODO:wifi turned on\n"));
   return 1;
 }
 
-/*---------------------------------------------------------------------------*/
-/* Process to handle input packets
- * Receive interrupts cause this process to be polled
- * It calls the core MAC layer which calls rf230_read to get the packet
- * rf230processflag can be printed in the main idle loop for debugging
- */
-
-PROCESS_THREAD(mrf24wb0ma_process, ev, data)
-{
-  PROCESS_BEGIN();
-
-  PROCESS_END();
-}
 /* Read packet that was uploaded from Radio in ISR, else return zero.
  * The two-byte checksum is appended but the returned length does not include it.
  * Frames are buffered in the interrupt routine so this routine
@@ -200,27 +178,27 @@ PROCESS_THREAD(mrf24wb0ma_process, ev, data)
  * As a result, PRINTF cannot be used in here.
  */
 /*---------------------------------------------------------------------------*/
-static int
-rf230_read(void *buf, unsigned short bufsize)
+static int MRF24WB0MA_read(void *buf, unsigned short bufsize)
 {
+  printf_P(PSTR("TODO:MRF24WB0MA_read\n"));
   return 0;
 }
 /*---------------------------------------------------------------------------*/
-static int
-rf230_cca(void)
+static int MRF24WB0MA_cca(void)
 {
+  printf_P(PSTR("TODO:MRF24WB0MA_cca\n"));
 	 return 0;
 }
 /*---------------------------------------------------------------------------*/
-int
-rf230_receiving_packet(void)
+int MRF24WB0MA_receiving_packet(void)
 {
+  printf_P(PSTR("TODO:MRF24WB0MA_receiving_packet\n"));
   return 0;
 }
 /*---------------------------------------------------------------------------*/
-static int
-rf230_pending_packet(void)
+static int MRF24WB0MA_pending_packet(void)
 {
+  printf_P(PSTR("TODO:MRF24WB0MA_pending_packet\n"));
   return 0;
 }
 /*---------------------------------------------------------------------------*/

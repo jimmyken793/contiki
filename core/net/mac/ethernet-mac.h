@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Swedish Institute of Computer Science.
+ * Copyright (c) 2007, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,21 +26,24 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * This file is part of the Contiki operating system.
+ *
  */
 
 /**
  * \file
- *         MAC framer for nullmac
+ *         A MAC protocol implementation that does not do anything.
  * \author
- *         Niclas Finne <nfi@sics.se>
- *         Joakim Eriksson <joakime@sics.se>
+ *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef __FRAMER_ETHERNET_H__
-#define __FRAMER_ETHERNET_H__
+#ifndef __ETHERNET_MAC_H__
+#define __ETHERNET_MAC_H__
 
-#include "net/mac/framer.h"
+#include "net/mac/mac.h"
+#include "dev/radio.h"
 
-extern const struct framer framer_ethernet;
+extern const struct mac_driver ethernet_mac_driver;
 
-#endif /* __FRAMER_ETHERNET_H__ */
+
+#endif /* __ETHERNET_MAC_H__ */

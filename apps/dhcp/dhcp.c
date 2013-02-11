@@ -97,44 +97,17 @@ makestrings(void)
 PROCESS_THREAD(dhcp_process, ev, data)
 {
   PROCESS_BEGIN();
+  printf("%02x:%02x:%02x:%02x:%02x:%02x\n",uip_ethaddr.addr[0],uip_ethaddr.addr[1],uip_ethaddr.addr[2],uip_ethaddr.addr[3],uip_ethaddr.addr[4],uip_ethaddr.addr[5]);
   
-  ctk_window_new(&window, 28, 7, "DHCP");
-  
-  CTK_WIDGET_ADD(&window, &getbutton);
-  CTK_WIDGET_ADD(&window, &statuslabel);
-  CTK_WIDGET_ADD(&window, &ipaddrlabel);
-  CTK_WIDGET_ADD(&window, &ipaddrentry);
-  CTK_WIDGET_ADD(&window, &netmasklabel);
-  CTK_WIDGET_ADD(&window, &netmaskentry);
-  CTK_WIDGET_ADD(&window, &gatewaylabel);
-  CTK_WIDGET_ADD(&window, &gatewayentry);
-  CTK_WIDGET_ADD(&window, &dnsserverlabel);
-  CTK_WIDGET_ADD(&window, &dnsserverentry);
-  
-  CTK_WIDGET_FOCUS(&window, &getbutton);
-
-  ctk_window_open(&window);
   dhcpc_init(uip_ethaddr.addr, sizeof(uip_ethaddr.addr));
-
-
+  dhcpc_request();
+  printf("dhcpc started!\n");
   while(1) {
     PROCESS_WAIT_EVENT();
-    
-    if(ev == ctk_signal_widget_activate) {
-      if(data == (process_data_t)&getbutton) {
-	dhcpc_request();
-	set_statustext("Requesting...");
-      }
-    } else if(ev == tcpip_event) {
+  printf("dhcpc event! %d\n",ev);
+    if(ev == tcpip_event) {
+  printf("dhcpc tcpip event!\n");
       dhcpc_appcall(ev, data);
-    } else if(ev == PROCESS_EVENT_EXIT ||
-	      ev == ctk_signal_window_close) {
-      ctk_window_close(&window);
-      process_exit(&dhcp_process);
-      LOADER_UNLOAD();
-    } else if(ev == SHOWCONFIG) {
-      makestrings();
-      ctk_window_redraw(&window);  
     }
   }
 
@@ -148,14 +121,12 @@ dhcpc_configured(const struct dhcpc_state *s)
   uip_setnetmask(&s->netmask);
   uip_setdraddr(&s->default_router);
   resolv_conf(&s->dnsaddr);
-  set_statustext("Configured.");
-  process_post(PROCESS_CURRENT(), SHOWCONFIG, NULL);
+  makeaddr(&s->ipaddr, ipaddr);
+  printf("new ip address: %s\n", ipaddr);
 }
 /*---------------------------------------------------------------------------*/
 void
 dhcpc_unconfigured(const struct dhcpc_state *s)
 {
-  set_statustext("Unconfigured.");
-  process_post(PROCESS_CURRENT(), SHOWCONFIG, NULL);
 }
 /*---------------------------------------------------------------------------*/

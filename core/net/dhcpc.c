@@ -53,10 +53,10 @@ struct dhcp_msg {
   uint8_t siaddr[4];
   uint8_t giaddr[4];
   uint8_t chaddr[16];
-#ifndef UIP_CONF_DHCP_LIGHT
+//#ifndef UIP_CONF_DHCP_LIGHT
   uint8_t sname[64];
   uint8_t file[128];
-#endif
+//#endif
   uint8_t options[312];
 };
 
@@ -154,10 +154,10 @@ create_msg(CC_REGISTER_ARG struct dhcp_msg *m)
   memset(m->giaddr, 0, sizeof(m->giaddr));
   memcpy(m->chaddr, s.mac_addr, s.mac_len);
   memset(&m->chaddr[s.mac_len], 0, sizeof(m->chaddr) - s.mac_len);
-#ifndef UIP_CONF_DHCP_LIGHT
+//#ifndef UIP_CONF_DHCP_LIGHT
   memset(m->sname, 0, sizeof(m->sname));
   memset(m->file, 0, sizeof(m->file));
-#endif
+//#endif
 
   memcpy(m->options, magic_cookie, sizeof(magic_cookie));
 }
@@ -170,10 +170,10 @@ send_discover(void)
 
   create_msg(m);
 
-  end = add_msg_type(&m->options[4], DHCPDISCOVER);
+  end = &m->options[4];
+  end = add_msg_type(end, DHCPDISCOVER);
   end = add_req_options(end);
   end = add_end(end);
-
   uip_send(uip_appdata, (int)(end - (uint8_t *)uip_appdata));
 }
 /*---------------------------------------------------------------------------*/
@@ -184,8 +184,8 @@ send_request(void)
   struct dhcp_msg *m = (struct dhcp_msg *)uip_appdata;
 
   create_msg(m);
-  
-  end = add_msg_type(&m->options[4], DHCPREQUEST);
+  end = &m->options[4];
+  end = add_msg_type(end, DHCPREQUEST);
   end = add_server_id(end);
   end = add_req_ipaddr(end);
   end = add_end(end);

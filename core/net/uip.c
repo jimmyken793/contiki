@@ -1,5 +1,4 @@
-#define DEBUG_PRINTF(...) /*printf(__VA_ARGS__)*/
-
+#define DEBUG_PRINTF(...) printf(__VA_ARGS__)
 /**
  * \addtogroup uip
  * @{
@@ -85,6 +84,7 @@
 #include "net/uip-neighbor.h"
 #endif /* UIP_CONF_IPV6 */
 
+#include <stdio.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -311,7 +311,6 @@ uip_ipchksum(void)
   uint16_t sum;
 
   sum = chksum(0, &uip_buf[UIP_LLH_LEN], UIP_IPH_LEN);
-  DEBUG_PRINTF("uip_ipchksum: sum 0x%04x\n", sum);
   return (sum == 0) ? 0xffff : uip_htons(sum);
 }
 #endif
@@ -1917,7 +1916,6 @@ uip_process(uint8_t flag)
   /* Calculate IP checksum. */
   BUF->ipchksum = 0;
   BUF->ipchksum = ~(uip_ipchksum());
-  DEBUG_PRINTF("uip ip_send_nolen: chkecum 0x%04x\n", uip_ipchksum());
 #endif /* UIP_CONF_IPV6 */   
   UIP_STAT(++uip_stat.tcp.sent);
 #if UIP_CONF_IPV6
@@ -1925,12 +1923,10 @@ uip_process(uint8_t flag)
 #endif /* UIP_CONF_IPV6 */
   DEBUG_PRINTF("Sending packet with length %d (%d)\n", uip_len,
 	       (BUF->len[0] << 8) | BUF->len[1]);
-  
   UIP_STAT(++uip_stat.ip.sent);
   /* Return and let the caller do the actual transmission. */
   uip_flags = 0;
   return;
-
  drop:
   uip_len = 0;
   uip_flags = 0;

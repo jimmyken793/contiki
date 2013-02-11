@@ -1,7 +1,7 @@
 #ifndef RADIO_CONFIG_H
 #define RADIO_CONFIG_H
 
-#define RADIO_BUFFER_LEN 400
+#define RADIO_BUFFER_LEN 1000
 
 #include <stdint.h>
 #include <avr/pgmspace.h>

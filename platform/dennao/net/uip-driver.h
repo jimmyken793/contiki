@@ -30,61 +30,19 @@
 
 /**
  * \file
- *         Basic SPI macros
+ *         A brief description of what this file is
  * \author
- *         Joakim Eriksson <joakime@sics.se>
  *         Niclas Finne <nfi@sics.se>
+ *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef __SPI_H__
-#define __SPI_H__
+#ifndef __UIP_DRIVER_H__
+#define __UIP_DRIVER_H__
 
-/* Define macros to use for checking SPI transmission status depending
-   on if it is possible to wait for TX buffer ready. This is possible
-   on for example MSP430 but not on AVR. */
-#ifdef SPI_WAITFORTxREADY
-#define SPI_WAITFORTx_BEFORE() SPI_WAITFORTxREADY()
-#define SPI_WAITFORTx_AFTER()
-#define SPI_WAITFORTx_ENDED() SPI_WAITFOREOTx()
-#else /* SPI_WAITFORTxREADY */
-#define SPI_WAITFORTx_BEFORE()
-#define SPI_WAITFORTx_AFTER() SPI_WAITFOREOTx()
-#define SPI_WAITFORTx_ENDED()
-#endif /* SPI_WAITFORTxREADY */
+#include "net/netstack.h"
 
-extern unsigned char spi_busy;
+uint8_t uip_driver_send(void);
 
-void spi_init(void);
+extern const struct network_driver uip_driver;
 
-/* Write one character to SPI */
-#define SPI_WRITE(data)                         \
-  do {                                          \
-    SPI_WAITFORTx_BEFORE();                     \
-    SPI_TXBUF = data;                           \
-    SPI_WAITFOREOTx();                          \
-  } while(0)
-
-/* Write one character to SPI - will not wait for end
-   useful for multiple writes with wait after final */
-#define SPI_WRITE_FAST(data)                    \
-  do {                                          \
-    SPI_WAITFORTx_BEFORE();                     \
-    SPI_TXBUF = data;                           \
-    SPI_WAITFORTx_AFTER();                      \
-  } while(0)
-
-/* Read one character from SPI */
-#define SPI_READ(data)   \
-  do {                   \
-    SPI_WAITFOREORx();   \
-    data = SPI_RXBUF;    \
-  } while(0)
-
-/* Flush the SPI read register */
-#define SPI_FLUSH() \
-  do {              \
-    SPI_RXBUF;      \
-  } while(0);
-
-
-#endif /* __SPI_H__ */
+#endif /* __UIP_DRIVER_H__ */

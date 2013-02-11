@@ -37,136 +37,28 @@
 #define G2100_H_
 
 #include "config.h"
-
-// Uncomment one line below to
-// specify which Arduino pin
-// to use as WiShield interrupt
-#define USE_DIG0_INTR   // use digital pin 0
-//#define USE_DIG8_INTR   // use digital pin 8
+#include "sys/process.h"
+#include "net/netstack.h"
 
 
-#ifdef USE_DIG0_INTR
+#define MAX_SSID_LENGTH 32
+#define MAX_PASSPHRASE_LENGTH 64
+void wifi_set_ssid(char* new_ssid);
+void wifi_set_passphrase(char* new_passphrase);
+void wifi_set_security_type(u8 type);
+void wifi_connect();
+void wifi_prepare_payload(char* buf, U16 len);
+void wifi_send();
+void wifi_set_mode(U8 mode);
+void wifi_getMAC(uint8_t* d);
+
 #define ZG2100_ISR_DISABLE()  (EIMSK &= ~(0x01))
 #define ZG2100_ISR_ENABLE()   (EIMSK |= 0x01)
 #define ZG2100_ISR_GET(X)   (X = EIMSK)
 #define ZG2100_ISR_SET(X)   (EIMSK = X)
-#endif
 
-#ifdef USE_DIG8_INTR
-#define ZG2100_ISR_DISABLE()  (PCMSK0 &= ~(0x01))
-#define ZG2100_ISR_ENABLE()   (PCMSK0 |= 0x01)
-#define ZG2100_ISR_GET(X)   (X = PCMSK0)
-#define ZG2100_ISR_SET(X)   (PCMSK0 = X)
-#endif
-
-//AVR Mega168 SPI HAL
-#define BIT0              0x01
-#define BIT1              0x02
-#define BIT2              0x04
-#define BIT3              0x08
-#define BIT4              0x10
-#define BIT5              0x20
-#define BIT6              0x40
-#define BIT7              0x80
-
-#ifdef USE_DIG8_INTR
-#define ZG2100_INTR           BIT0
-#endif
-
-#define SPI0_SS_BIT           BIT0
-#define SPI0_SS_DDR           DDRB
-#define SPI0_SS_PORT          PORTB
-
-#define SPI0_SCLK_BIT         BIT1
-#define SPI0_SCLK_DDR         DDRB
-#define SPI0_SCLK_PORT          PORTB
-
-#define SPI0_MOSI_BIT         BIT2
-#define SPI0_MOSI_DDR         DDRB
-#define SPI0_MOSI_PORT          PORTB
-
-#define SPI0_MISO_BIT         BIT3
-#define SPI0_MISO_DDR         DDRB
-#define SPI0_MISO_PORT          PORTB
-
-
-#define SPI0_WaitForReceive()
-#define SPI0_RxData()         (SPDR)
-
-#define SPI0_TxData(Data)       (SPDR = Data)
-#define SPI0_WaitForSend()        while( (SPSR & 0x80)==0x00 )
-
-#define SPI0_SendByte(Data)       SPI0_TxData(Data);SPI0_WaitForSend()
-#define SPI0_RecvBute()         SPI0_RxData()
-
-// PB4(MISO), PB3(MOSI), PB5(SCK), PB2(/SS)         // CS=1, waiting for SPI start // SPI mode 0, 8MHz
-#ifdef USE_DIG8_INTR
-#define SPI0_Init()           PRR0 = 0x00;\
-                                        DDRB  |= SPI0_SS_BIT|SPI0_SCLK_BIT|SPI0_MOSI_BIT|LEDConn_BIT;\
-                    DDRB  &= ~(SPI0_MISO_BIT|ZG2100_INTR);\
-                    PORTB = SPI0_SS_BIT;\
-                    SPCR  = 0x50;\
-                    SPSR  = 0x01
-#else
-#define SPI0_Init()           PRR0 = 0x00;\
-                                        DDRB  |= SPI0_SS_BIT|SPI0_SCLK_BIT|SPI0_MOSI_BIT|LEDConn_BIT;\
-                    DDRB  &= ~SPI0_MISO_BIT;\
-                    PORTB = SPI0_SS_BIT;\
-                    SPCR  = 0x50;\
-                    SPSR  = 0x01
-#endif
-
-//ZG2100 SPI HAL
-#define ZG2100_SpiInit          SPI0_Init
-#define ZG2100_SpiSendData        SPI0_SendByte
-#define ZG2100_SpiRecvData        SPI0_RxData
-
-
-#define ZG2100_CS_BIT         BIT0
-#define ZG2100_CS_DDR         DDRB
-#define ZG2100_CS_PORT          PORTB
-
-#define ZG2100_CSInit()         (ZG2100_CS_DDR |= ZG2100_CS_BIT)
-#define ZG2100_CSon()         (ZG2100_CS_PORT |= ZG2100_CS_BIT)
-#define ZG2100_CSoff()          (ZG2100_CS_PORT &= ~ZG2100_CS_BIT)
-
-#define LEDConn_BIT         BIT6
-#define LEDConn_DDR         DDRH
-#define LEDConn_PORT        PORTH
-
-#define LED0_BIT          BIT0
-#define LED0_DDR          DDRC
-#define LED0_PORT         PORTC
-
-#define LED1_BIT          BIT1
-#define LED1_DDR          DDRC
-#define LED1_PORT         PORTC
-
-#define LED2_BIT          BIT2
-#define LED2_DDR          DDRC
-#define LED2_PORT         PORTC
-
-#define LED3_BIT          BIT3
-#define LED3_DDR          DDRC
-#define LED3_PORT         PORTC
-
-#define LED_Init()    (DDRC |= LED0_BIT | LED1_BIT | LED2_BIT | LED3_BIT)
-
-#define LEDConn_on()  (LEDConn_PORT |= LEDConn_BIT)
-#define LED0_on()   (LED0_PORT |= LED0_BIT)
-#define LED1_on()   (LED0_PORT |= LED1_BIT)
-#define LED2_on()   (LED0_PORT |= LED2_BIT)
-#define LED3_on()   (LED0_PORT |= LED3_BIT)
-
-#define LEDConn_off() (LEDConn_PORT &= ~LEDConn_BIT)
-#define LED0_off()    (LED0_PORT &= ~LED0_BIT)
-#define LED1_off()    (LED0_PORT &= ~LED1_BIT)
-#define LED2_off()    (LED0_PORT &= ~LED2_BIT)
-#define LED3_off()    (LED0_PORT &= ~LED3_BIT)
-
-#define LED0_toggle() ((LED0_PORT & LED0_BIT)?(LED0_PORT &= ~LED0_BIT):(LED0_PORT |= LED0_BIT))
-#define LED1_toggle() ((LED0_PORT & LED1_BIT)?(LED0_PORT &= ~LED1_BIT):(LED0_PORT |= LED1_BIT))
-#define LED3_toggle() ((LED0_PORT & LED3_BIT)?(LED0_PORT &= ~LED3_BIT):(LED0_PORT |= LED3_BIT))
+#define ZG2100_CSon()         (PORTB |= BV(CSN))
+#define ZG2100_CSoff()          (PORTB &= ~BV(CSN))
 
 #define DRV_STATE_INIT					0
 #define DRV_STATE_GET_MAC				2
@@ -315,10 +207,6 @@ enum {
 #define ZG_INTR_ST_WT_INTR_REG	(2)
 #define ZG_INTR_ST_RD_CTRL_REG	(3)
 
-// interrupt state
-#define ZG_INTR_DISABLE		((u8)0)
-#define ZG_INTR_ENABLE		((u8)1)
-
 // mask values for ZG_INTR_REG and ZG_INTR2_REG
 #define	ZG_INTR_MASK_FIFO1		(0x80)
 #define ZG_INTR_MASK_FIFO0		(0x40)
@@ -333,7 +221,7 @@ enum {
 #define ZG_BSS_ADHOC		(2)    // Ad-hoc only (ibss)
 
 // Max characters in network SSID
-#define ZG_MAX_SSID_LENGTH		32
+#define ZG_MAX_SSID_LENGTH		MAX_SSID_LENGTH
 
 // Security keys
 #define ZG_MAX_ENCRYPTION_KEYS 		4
@@ -410,7 +298,6 @@ typedef struct
 } zg_connect_req_t;
 
 #define ZG_CONNECT_REQ_SIZE			(38)
-void set_ssid(char* new_ssid);
 void zg_init();
 void zg_reset();
 void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs);

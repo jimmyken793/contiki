@@ -60,7 +60,4 @@ typedef unsigned char spl_t;
 static inline void splx(spl_t s) { SREG = s; }
 static inline spl_t splhigh(void) { spl_t s = SREG; cli(); return s; }
 
-void attachInterrupt(uint8_t, void (*)(void), int mode);
-void detachInterrupt(uint8_t);
-
 #endif /* AVRDEF_H */

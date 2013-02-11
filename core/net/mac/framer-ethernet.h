@@ -36,11 +36,11 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef __FRAMER_ETHERNET_H__
-#define __FRAMER_ETHERNET_H__
+#ifndef __FRAMER_NULLMAC_H__
+#define __FRAMER_NULLMAC_H__
 
 #include "net/mac/framer.h"
 
-extern const struct framer framer_ethernet;
+extern const struct framer framer_nullmac;
 
-#endif /* __FRAMER_ETHERNET_H__ */
+#endif /* __FRAMER_NULLMAC_H__ */

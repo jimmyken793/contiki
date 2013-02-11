@@ -342,7 +342,6 @@ uip_ipchksum(void)
   uint16_t sum;
 
   sum = chksum(0, &uip_buf[UIP_LLH_LEN], UIP_IPH_LEN);
-  PRINTF("uip_ipchksum: sum 0x%04x\n", sum);
   return (sum == 0) ? 0xffff : uip_htons(sum);
 }
 #endif

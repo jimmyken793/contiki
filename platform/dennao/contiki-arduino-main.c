@@ -40,11 +40,7 @@
 #include "loader/symbols-def.h"
 #include "loader/symtab.h"
 #include <stdbool.h>
-//#include "mac.h"
-//#include "sicslowmac.h"
-//#include "sicslowpan.h"
-//#include "ieee-15-4-manager.h"
-
+ 
 #include "contiki.h"
 #include "contiki-net.h"
 #include "contiki-lib.h"
@@ -53,9 +49,10 @@
 #include "dev/serial-line.h"
 #include "dev/slip.h"
 
-//#include "sicslowmac.h"
-#include "../../cpu/avr/radio/mrf24wb0ma/mrf24wb0ma.h"
-#include "platform-conf.h"
+#include "radio/mrf24wb0ma/mrf24wb0ma.h"
+#include "contiki-conf.h"
+#include "dhcp.h"
+#include "net/uip-driver.h"
 
 #if 0
 FUSES =
@@ -89,8 +86,8 @@ init_lowlevel(void)
 
 }
 
-int
-main(void)
+
+int main(void)
 {
   //calibrate_rc_osc_32k(); //CO: Had to comment this out
 
@@ -110,52 +107,59 @@ main(void)
   //Give ourselves a prefix
   //init_net();
 
+    /* System timers */
+  process_start(&etimer_process, NULL);
+  ctimer_init();
+
   /* This line wasn't present in ProMini code */
   /* Make pin 5 on port B an input (PB5 SCK/PCINT5) */
   PORTB &= ~(1<<5);
   serial_line_init();
 
   printf_P(PSTR("\r\n********BOOTING CONTIKI*********\r\n"));
+  printf("sizeof(zg_rx_data_ind_t): %d \n", sizeof(zg_rx_data_ind_t));
 
+  wifi_set_ssid("Jimmy");
+  wifi_set_passphrase("jimmy12345orz");
+  wifi_set_mode(WIRELESS_MODE_INFRA);
+  wifi_set_security_type(ZG_SECURITY_TYPE_WPA2);
+  // wifi_set_ssid("JimmyTest");
+  // wifi_set_passphrase("jimmy12345orz");
+  // wifi_set_mode(WIRELESS_MODE_ADHOC);
+  // wifi_set_security_type(ZG_SECURITY_TYPE_NONE);
+  queuebuf_init();
+  NETSTACK_RADIO.init();
+  NETSTACK_RDC.init();
+  NETSTACK_MAC.init();
+  NETSTACK_NETWORK.init();
+  wifi_connect();
+  process_start(&mrf24wb0ma_process,NULL);
+  struct uip_eth_addr addr;
+  wifi_getMAC(addr.addr);
+  uip_setethaddr(addr);
+  uip_arp_init();
+
+  printf("%s %lu %u\n",
+         NETSTACK_RDC.name,
+         CLOCK_SECOND / (NETSTACK_RDC.channel_check_interval() == 0? 1:
+                         NETSTACK_RDC.channel_check_interval()),
+         RF_CHANNEL);
   /* Autostart processes */
   autostart_start(autostart_processes);
-  set_ssid("jizz");
-  netstack_init();
-  printf("MAC %s RDC %s NETWORK %s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
+
+  printf("MAC:%s\nRDC:%s\nNETWORK:%s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
   #if WITH_UIP
   /* IPv4 CONFIGURATION */
-  {
-    uip_ipaddr_t hostaddr, netmask;
-
     process_start(&tcpip_process, NULL);
-    process_start(&uip_fw_process, NULL);
-    process_start(&slip_process, NULL);
-
-    slip_set_input_callback(set_gateway);
-
-    uip_init();
-    uip_fw_init();
-    uip_ipaddr(&hostaddr, 172,16,rimeaddr_node_addr.u8[0],rimeaddr_node_addr.u8[1]);
-    uip_ipaddr(&netmask, 255,255,0,0);
-    uip_ipaddr_copy(&meshif.ipaddr, &hostaddr);
-
-    uip_sethostaddr(&hostaddr);
-    uip_setnetmask(&netmask);
-    uip_over_mesh_set_net(&hostaddr, &netmask);
-    uip_over_mesh_set_gateway_netif(&slipif);
-    uip_fw_default(&meshif);
-    uip_over_mesh_init(UIP_OVER_MESH_CHANNEL);
-
-    rs232_set_input(slip_input_byte);
-    printf("IPv4 address: %d.%d.%d.%d\n", uip_ipaddr_to_quad(&hostaddr));
-  }
-#endif /* WITH_UIP */
-  process_start(&mrf24wb0ma_process,NULL);
+    //process_start(&uip_fw_process, NULL);
+    process_start(&dhcp_process, NULL);
+  #endif /* WITH_UIP */
   printf_P(PSTR("System online.\r\n"));
-
-  /* Main scheduler loop */
+  watchdog_start();
   do {
     process_run();
+    watchdog_periodic();
+    etimer_request_poll();
   } while (1);
 
   return 0;

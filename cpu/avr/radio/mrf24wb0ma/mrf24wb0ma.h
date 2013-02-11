@@ -57,6 +57,7 @@
 #include "g2100.h"
 #include "atmega128rfa1_registermap.h"
 #include "dev/radio.h"
+#include "dennao_interrupt.h"
 
 #define RADIO_STATUS_START_VALUE                  ( 0x40 )
 
@@ -90,26 +91,24 @@ typedef enum{
 
 const struct radio_driver rf230_driver;
 
-int rf230_init(void);
-void rf230_warm_reset(void);
-void rf230_start_sneeze(void);
-void rf230_set_channel(uint8_t channel);
-void rf230_listen_channel(uint8_t channel);
-uint8_t rf230_get_channel(void);
-void rf230_set_pan_addr(unsigned pan,unsigned addr,const uint8_t ieee_addr[8]);
-void rf230_set_txpower(uint8_t power);
-uint8_t rf230_get_txpower(void);
+int MRF24WB0MA_init(void);
+void MRF24WB0MA_warm_reset(void);
+void MRF24WB0MA_start_sneeze(void);
+void MRF24WB0MA_set_channel(uint8_t channel);
+void MRF24WB0MA_listen_channel(uint8_t channel);
+uint8_t MRF24WB0MA_get_channel(void);
+void MRF24WB0MA_set_pan_addr(unsigned pan,unsigned addr,const uint8_t ieee_addr[8]);
+void MRF24WB0MA_set_txpower(uint8_t power);
+uint8_t MRF24WB0MA_get_txpower(void);
 
-void rf230_set_promiscuous_mode(bool isPromiscuous);
-bool rf230_is_ready_to_send();
+void MRF24WB0MA_set_promiscuous_mode(bool isPromiscuous);
+bool MRF24WB0MA_is_ready_to_send();
 
 extern uint8_t rf230_last_correlation,rf230_last_rssi,rf230_smallest_rssi;
 
-uint8_t rf230_get_raw_rssi(void);
+uint8_t MRF24WB0MA_get_raw_rssi(void);
 
 PROCESS_NAME(mrf24wb0ma_process);
-
-#define rf230_rssi	rf230_get_raw_rssi
 
 #endif
 /** @} */

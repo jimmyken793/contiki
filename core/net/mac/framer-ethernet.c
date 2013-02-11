@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, Swedish Institute of Computer Science.
+ * Copyright (c) 2009, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,47 +26,68 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * This file is part of the Contiki operating system.
- *
  */
 
 /**
  * \file
- *         Implementation of module for automatically starting and exiting a list of processes.
+ *         MAC framer for nullmac
  * \author
- *         Adam Dunkels <adam@sics.se>
+ *         Niclas Finne <nfi@sics.se>
+ *         Joakim Eriksson <joakime@sics.se>
  */
 
-#include "sys/autostart.h"
+#include "net/mac/framer-ethernet.h"
+#include "net/packetbuf.h"
+#include "net/uip_arp.h"
 
-#define DEBUG 1
+#define DEBUG 0
+
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTADDR(addr) PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7])
 #else
 #define PRINTF(...)
+#define PRINTADDR(addr)
 #endif
+static const struct uip_eth_addr broadcast_ethaddr =
+  {{0xff,0xff,0xff,0xff,0xff,0xff}};
+/*---------------------------------------------------------------------------*/
+static int
+create(void)
+{
+  struct uip_eth_hdr *hdr;
 
-/*---------------------------------------------------------------------------*/
-void
-autostart_start(struct process * const processes[])
-{
-  int i;
-  
-  for(i = 0; processes[i] != NULL; ++i) {
-    process_start(processes[i], NULL);
-    PRINTF("autostart_start: starting process '%s'\n", processes[i]->name);
+  if(packetbuf_hdralloc(sizeof(struct uip_eth_hdr))) {
+    hdr = packetbuf_hdrptr();
+    memcpy(&(hdr->src), &uip_ethaddr, 6);
+    memcpy(&(hdr->dest), &broadcast_ethaddr, 6);
+    hdr->type = 0x08;
+    return sizeof(struct uip_eth_hdr);
   }
+  PRINTF("PNULLMAC-UT: too large header: %u\n", len);
+  return FRAMER_FAILED;
 }
 /*---------------------------------------------------------------------------*/
-void
-autostart_exit(struct process * const processes[])
+static int
+parse(void)
 {
-  int i;
-  
-  for(i = 0; processes[i] != NULL; ++i) {
-    process_exit(processes[i]);
-    PRINTF("autostart_exit: stopping process '%s'\n", processes[i]->name);
+  struct uip_eth_hdr *hdr;
+  hdr = packetbuf_dataptr();
+  if(packetbuf_hdrreduce(sizeof(struct uip_eth_hdr))) {
+    packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &(hdr->src));
+    packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &(hdr->dest));
+
+    PRINTF("PNULLMAC-IN: ");
+    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER));
+    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
+    PRINTF("%u (%u)\n", packetbuf_datalen(), len);
+
+    return sizeof(struct uip_eth_hdr);
   }
+  return FRAMER_FAILED;
 }
 /*---------------------------------------------------------------------------*/
+const struct framer framer_ethernet = {
+  create, parse
+};

@@ -46,6 +46,10 @@
 #define HAVE_STDINT_H
 #include "avrdef.h"
 
+#ifndef WITH_UIP
+#define WITH_UIP 1
+#endif
+
 #define PLATFORM_NAME  "DENNAO"
 #define PLATFORM_TYPE  DENNAO
 #ifndef F_CPU
@@ -64,7 +68,7 @@
 #define MCU_MHZ 16
 
 /* Clock ticks per second */
-#define CLOCK_CONF_SECOND 125
+#define CLOCK_CONF_SECOND 128
 
 
 /* LED ports */
@@ -99,7 +103,6 @@
 #define EEPROM_NODE_ID_START 0x00
 
 
-#define NETSTACK_CONF_RADIO   mrf24wb0ma_driver
 
 
 /*
@@ -115,23 +118,19 @@
 #define SPI_WAITFOREOTx() do { while( (SPSR & 0x80)==0x00 ); } while (0)
 #define SPI_WAITFOREORx() 
 
-#define SCK            13  /* - Output: SPI Serial Clock (SCLK) - ATMEGA128 PORTB, PIN1 */
-#define MOSI           11  /* - Output: SPI Master out - slave in (MOSI) - ATMEGA128 PORTB, PIN2 */
-#define MISO           12  /* - Input:  SPI Master in - slave out (MISO) - ATMEGA128 PORTB, PIN3 */
-
-/*
- * SPI bus - CC2420 pin configuration.
- */
-
-#define CSN            10
+#define SCK            PB1  /* - Output: SPI Serial Clock (SCLK) - ATMEGA128 PORTB, PIN1 */
+#define MOSI           PB2  /* - Output: SPI Master out - slave in (MOSI) - ATMEGA128 PORTB, PIN2 */
+#define MISO           PB3  /* - Input:  SPI Master in - slave out (MISO) - ATMEGA128 PORTB, PIN3 */
+#define CSN            PB0
 
 #if WITH_UIP6
 
 /* Network setup for IPv6 */
-#define NETSTACK_CONF_NETWORK sicslowpan_driver
+#define NETSTACK_CONF_NETWORK uip_driver
 #define NETSTACK_CONF_MAC     csma_driver
-#define NETSTACK_CONF_RDC     nullrdc_driver
-#define NETSTACK_CONF_FRAMER  framer_802154
+#define NETSTACK_CONF_RDC     nullrdc_noframer_driver
+#define NETSTACK_CONF_FRAMER  framer_ethernet
+#define NETSTACK_CONF_RADIO   mrf24wb0ma_driver
 
 #define CC2420_CONF_AUTOACK              1
 #define MAC_CONF_CHANNEL_CHECK_RATE      8
@@ -142,12 +141,16 @@
 
 /* Network setup for non-IPv6 (rime). */
 
-#define NETSTACK_CONF_NETWORK rime_driver
-#define NETSTACK_CONF_MAC     csma_driver
-#define NETSTACK_CONF_RDC     cxmac_driver
-#define NETSTACK_CONF_FRAMER  framer_802154
+#define NETSTACK_CONF_NETWORK uip_driver
+#define NETSTACK_CONF_MAC     ethernet_mac_driver
+#define NETSTACK_CONF_RDC     nullrdc_noframer_driver
+#define NETSTACK_CONF_FRAMER  framer_ethernet
+#define NETSTACK_CONF_RADIO   mrf24wb0ma_driver
 
-#define CC2420_CONF_AUTOACK              1
+#define QUEUEBUF_CONF_NUM     0
+#define QUEUEBUF_CONF_REF_NUM 0
+#define ROUTE_CONF_ENTRIES    0
+
 #define MAC_CONF_CHANNEL_CHECK_RATE      8
 
 #define COLLECT_CONF_ANNOUNCEMENTS       1
@@ -169,9 +172,6 @@
 
 #define CONTIKIMAC_CONF_BROADCAST_RATE_LIMIT 0
 
-#define IEEE802154_CONF_PANID       0xABCD
-
-
 #define AODV_COMPLIANCE
 #define AODV_NUM_RT_ENTRIES 32
 
@@ -185,7 +185,7 @@
 #define RIMEADDR_CONF_SIZE              8
 
 #define UIP_CONF_LL_802154              1
-#define UIP_CONF_LLH_LEN                0
+#define UIP_CONF_LLH_LEN                14
 
 #define UIP_CONF_ROUTER                 1
 #define UIP_CONF_IPV6_RPL               1
@@ -210,7 +210,7 @@
 #define UIP_CONF_ND6_MAX_NEIGHBORS      4
 #define UIP_CONF_ND6_MAX_DEFROUTERS     2
 #define UIP_CONF_IP_FORWARD             0
-#define UIP_CONF_BUFFER_SIZE		    240
+#define UIP_CONF_BUFFER_SIZE		    1000
 
 #define SICSLOWPAN_CONF_COMPRESSION_IPV6        0
 #define SICSLOWPAN_CONF_COMPRESSION_HC1         1
@@ -223,21 +223,16 @@
 #define SICSLOWPAN_CONF_CONVENTIONAL_MAC	1
 #define SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS       2
 #else /* WITH_UIP6 */
-#define UIP_CONF_IP_FORWARD      1
-#define UIP_CONF_BUFFER_SIZE     128
+#define UIP_CONF_IP_FORWARD      0
+#define UIP_CONF_BUFFER_SIZE     1000
 #endif /* WITH_UIP6 */
 
 #define UIP_CONF_ICMP_DEST_UNREACH 1
 
-#if !WITH_UIP && !WITH_UIP6
-#define QUEUEBUF_CONF_NUM          8
-#else
-#define QUEUEBUF_CONF_NUM          4
-#endif
-
 #define TIMESYNCH_CONF_ENABLED 1
 #define CC2420_CONF_TIMESTAMPS 1
 #define CC2420_CONF_SYMBOL_LOOP_COUNT 500
+#define PACKETBUF_CONF_SIZE 1000
 
 #define WITH_NULLMAC 0
 
@@ -245,12 +240,12 @@
 #define CLIF
 
 /* The process names are not used to save RAM */
-#define PROCESS_CONF_NO_PROCESS_NAMES 1
+#define PROCESS_CONF_NO_PROCESS_NAMES 0
 
 #define UIP_CONF_ICMP_DEST_UNREACH 1
 
 #define UIP_CONF_DHCP_LIGHT
-#define UIP_CONF_LLH_LEN         0
+#define UIP_CONF_LLH_LEN         14
 #define UIP_CONF_RECEIVE_WINDOW  48
 #define UIP_CONF_TCP_MSS         48
 #define UIP_CONF_MAX_CONNECTIONS 4
@@ -259,13 +254,13 @@
 #define UIP_CONF_FWCACHE_SIZE    15
 #define UIP_CONF_BROADCAST       1
 //#define UIP_ARCH_IPCHKSUM        1
+#define UIP_CONF_TCP             1
 #define UIP_CONF_UDP             1
 #define UIP_CONF_UDP_CHECKSUMS   1
 #define UIP_CONF_PINGADDRCONF    0
 #define UIP_CONF_LOGGING         0
 
 #define UIP_CONF_TCP_SPLIT       0
-
 
 typedef unsigned short clock_time_t;
 typedef unsigned short uip_stats_t;

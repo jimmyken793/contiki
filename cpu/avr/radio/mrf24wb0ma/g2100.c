@@ -38,7 +38,15 @@
 #include <avr/io.h> 
 #include "dev/spi.h"
 #include "contiki-conf.h"
+#include "dennao_interrupt.h"
+#include "process.h"
 #include "g2100.h"
+#define DEBUG
+#ifdef DEBUG
+#define DEBUG_PRINT(...) printf(__VA_ARGS__)
+#else
+#define DEBUG_PRINT(...)
+#endif
 
 static U8 mac[6];
 static U8 zg_conn_status;
@@ -56,25 +64,62 @@ static U16 zg_buf_len;
 static U8 wpa_psk_key[32];
 
 // local state 
-char ssid[33];
+char ssid[MAX_SSID_LENGTH+1];
 U8 ssid_len;
-char security_passphrase[65];
+char security_passphrase[MAX_PASSPHRASE_LENGTH+1];
 U8 security_passphrase_len;
 U8 security_type;
 U8 wireless_mode;
 unsigned char wep_keys[];
 
-void set_ssid(char* new_ssid){
-	strcpy(ssid, new_ssid);
+
+PROCESS(mrf24wb0ma_process, "mrf24wb0ma driver");
+void wifi_set_security_type(u8 type){
+	security_type = type;
+}
+void wifi_set_ssid(char* new_ssid){
+	strlcpy(ssid, new_ssid, MAX_SSID_LENGTH+1);
+	ssid_len = (U8)strlen(ssid);
+	if (ssid_len > MAX_SSID_LENGTH){
+		ssid_len = MAX_SSID_LENGTH;
+	}
 }
 
+void wifi_set_passphrase(char* new_passphrase){
+	strlcpy(security_passphrase,new_passphrase, MAX_PASSPHRASE_LENGTH+1);
+	security_passphrase_len = (U8)strlen(security_passphrase);
+	if (security_passphrase_len > MAX_PASSPHRASE_LENGTH){
+		security_passphrase_len = MAX_PASSPHRASE_LENGTH;
+	}
+}
 
+void wifi_connect(){
+	printf("waiting for wifi connection...\n");
+	while(zg_get_conn_state() != 1) {
+		zg_drv_process();
+	}
+	printf("wifi connection established\n");
+}
+
+void wifi_prepare_payload(char* buf, U16 len){
+	memcpy(zg_buf, buf, len);
+	zg_buf_len = len;
+}
+void wifi_set_mode(U8 mode){
+	wireless_mode = mode;
+}
+
+void wifi_send(){
+  zg_set_tx_status(1);
+}
+
+void wifi_getMAC(uint8_t* d){
+	memcpy(d,mac,sizeof(mac));
+}
 
 void zg_init()
 {
 	U8 clr;
-
-	printf_P(PSTR("spi init\n"));
 	spi_init();
 	clr = SPSR;
 	clr = SPDR;
@@ -87,26 +132,21 @@ void zg_init()
 	rx_ready = 0;
 	cnf_pending = 0;
 	zg_buf_len = RADIO_BUFFER_LEN;
-
-	printf_P(PSTR("chip reset\n"));
 	zg_chip_reset();
 	zg_interrupt2_reg();
 	zg_interrupt_reg(0xff, 0);
 	zg_interrupt_reg(0x80|0x40, 1);
+	attachInterrupt(2, zg_isr, 0);
 
-	printf_P(PSTR("copy ssid\n"));
-	ssid_len = (U8)strlen(ssid);
-	security_passphrase_len = (U8)strlen(security_passphrase);
 }
 
 void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs)
 {
 	U16 i;
-
 	ZG2100_CSoff();
 
 	for (i = 0; i < len; i++) {
-		SPI_WRITE(buf[i]);		// Start the transmission
+		SPI_WRITE(buf[i]);
 		SPI_READ(buf[i]);
 	}
 
@@ -118,34 +158,39 @@ void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs)
 
 void zg_chip_reset()
 {
-	U8 loop_cnt = 0;
+	// write reset register addr
+	hdr[0] = ZG_INDEX_ADDR_REG;
+	hdr[1] = 0x00;
+	hdr[2] = ZG_RESET_REG;
+	spi_transfer(hdr, 3, 1);
 
-	do {
-		// write reset register addr
-		hdr[0] = ZG_INDEX_ADDR_REG;
-		hdr[1] = 0x00;
-		hdr[2] = ZG_RESET_REG;
-		spi_transfer(hdr, 3, 1);
+	hdr[0] = ZG_INDEX_DATA_REG;
+	hdr[1] = 0x80;
+	hdr[2] = 0xff;
+	spi_transfer(hdr, 3, 1);
 
-		hdr[0] = ZG_INDEX_DATA_REG;
-		hdr[1] = (loop_cnt == 0)?(0x80):(0x0f);
-		hdr[2] = 0xff;
-		spi_transfer(hdr, 3, 1);
-	} while(loop_cnt++ < 1);
+	// write reset register addr
+	hdr[0] = ZG_INDEX_ADDR_REG;
+	hdr[1] = 0x00;
+	hdr[2] = ZG_RESET_REG;
+	spi_transfer(hdr, 3, 1);
+
+	hdr[0] = ZG_INDEX_DATA_REG;
+	hdr[1] = 0x0f;
+	hdr[2] = 0xff;
+	spi_transfer(hdr, 3, 1);
 
 	// write reset register data
 	hdr[0] = ZG_INDEX_ADDR_REG;
 	hdr[1] = 0x00;
 	hdr[2] = ZG_RESET_STATUS_REG;
 	spi_transfer(hdr, 3, 1);
-
 	do {
 		hdr[0] = 0x40 | ZG_INDEX_DATA_REG;
 		hdr[1] = 0x00;
 		hdr[2] = 0x00;
 		spi_transfer(hdr, 3, 1);
 	} while((hdr[1] & ZG_RESET_MASK) == 0);
-
 	do {
 		hdr[0] = 0x40 | ZG_BYTE_COUNT_REG;
 		hdr[1] = 0x00;
@@ -194,13 +239,14 @@ void zg_interrupt_reg(U8 mask, U8 state)
 
 void zg_isr()
 {
+	//printf("interrupt!\n");
 	ZG2100_ISR_DISABLE();
 	intr_occured = 1;
+	process_poll(&mrf24wb0ma_process);
 }
 
 void zg_process_isr()
 {
-	U8 intr_state = 0;
 	U8 next_cmd = 0;
 
 	hdr[0] = 0x40 | ZG_INTR_REG;
@@ -208,77 +254,34 @@ void zg_process_isr()
 	hdr[2] = 0x00;
 	spi_transfer(hdr, 3, 1);
 
-	intr_state = ZG_INTR_ST_RD_INTR_REG;
+	U8 intr_val = hdr[1] & hdr[2];
 
-	do {
-		switch(intr_state) {
-		case ZG_INTR_ST_RD_INTR_REG:
-		{
-			U8 intr_val = hdr[1] & hdr[2];
-
-			if ( (intr_val & ZG_INTR_MASK_FIFO1) == ZG_INTR_MASK_FIFO1) {
-				hdr[0] = ZG_INTR_REG;
-				hdr[1] = ZG_INTR_MASK_FIFO1;
-				spi_transfer(hdr, 2, 1);
-
-				intr_state = ZG_INTR_ST_WT_INTR_REG;
-				next_cmd = ZG_BYTE_COUNT_FIFO1_REG;
-			}
-			else if ( (intr_val & ZG_INTR_MASK_FIFO0) == ZG_INTR_MASK_FIFO0) {
-				hdr[0] = ZG_INTR_REG;
-				hdr[1] = ZG_INTR_MASK_FIFO0;
-				spi_transfer(hdr, 2, 1);
-
-				intr_state = ZG_INTR_ST_WT_INTR_REG;
-				next_cmd = ZG_BYTE_COUNT_FIFO0_REG;
-			}
-			else if (intr_val) {
-				intr_state = 0;
-			}
-			else {
-				intr_state = 0;
-			}
-
-			break;
-		}
-		case ZG_INTR_ST_WT_INTR_REG:
-			hdr[0] = 0x40 | next_cmd;
-			hdr[1] = 0x00;
-			hdr[2] = 0x00;
-			spi_transfer(hdr, 3, 1);
-
-			intr_state = ZG_INTR_ST_RD_CTRL_REG;
-			break;
-		case ZG_INTR_ST_RD_CTRL_REG:
-		{
-			U16 rx_byte_cnt = (0x0000 | (hdr[1] << 8) | hdr[2]) & 0x0fff;
-
-			zg_buf[0] = ZG_CMD_RD_FIFO;
-			spi_transfer(zg_buf, rx_byte_cnt + 1, 1);
-
-			hdr[0] = ZG_CMD_RD_FIFO_DONE;
-			spi_transfer(hdr, 1, 1);
-
-			intr_valid = 1;
-
-			intr_state = 0;
-			break;
-		}
-		}
-	} while (intr_state);
-#ifdef USE_DIG8_INTR
-	// PCINT0 supports only edge triggered INT
-	if (PORTB & 0x01) {
-		intr_occured = 0;
-		ZG2100_ISR_ENABLE();
+	if ( (intr_val & ZG_INTR_MASK_FIFO1) == ZG_INTR_MASK_FIFO1) {
+		hdr[0] = ZG_INTR_REG;
+		hdr[1] = ZG_INTR_MASK_FIFO1;
+		spi_transfer(hdr, 2, 1);
+		next_cmd = ZG_BYTE_COUNT_FIFO1_REG;
+	} else if ( (intr_val & ZG_INTR_MASK_FIFO0) == ZG_INTR_MASK_FIFO0) {
+		hdr[0] = ZG_INTR_REG;
+		hdr[1] = ZG_INTR_MASK_FIFO0;
+		spi_transfer(hdr, 2, 1);
+		next_cmd = ZG_BYTE_COUNT_FIFO0_REG;
 	}
-	else {
-		intr_occured = 1;
+
+	if (next_cmd != 0){
+		hdr[0] = 0x40 | next_cmd;
+		hdr[1] = 0x00;
+		hdr[2] = 0x00;
+		spi_transfer(hdr, 3, 1);
+		U16 rx_byte_cnt = (0x0000 | (hdr[1] << 8) | hdr[2]) & 0x0fff;
+		zg_buf[0] = ZG_CMD_RD_FIFO;
+		spi_transfer(zg_buf, rx_byte_cnt + 1, 1);
+		hdr[0] = ZG_CMD_RD_FIFO_DONE;
+		spi_transfer(hdr, 1, 1);
+		intr_valid = 1;
 	}
-#else
 	intr_occured = 0;
 	ZG2100_ISR_ENABLE();
-#endif
 }
 
 void zg_send(U8* buf, U16 len)
@@ -331,6 +334,7 @@ void zg_clear_rx_status()
 void zg_set_tx_status(U8 status)
 {
 	tx_ready = status;
+	process_poll(&mrf24wb0ma_process);
 }
 
 U8 zg_get_conn_state()
@@ -387,67 +391,95 @@ static void zg_write_psk_key(U8* cmd_buf)
 	return;
 }
 
+PROCESS_THREAD(mrf24wb0ma_process, ev, data)
+{
+  int len;
+  PROCESS_BEGIN();
+    DEBUG_PRINT("process started!\n");
+  while(1) {
+  	PROCESS_WAIT_EVENT();//(tx_ready || intr_occured || intr_valid || zg_drv_state != DRV_STATE_IDLE);
+    //DEBUG_PRINT("process polled!\n");
+  	zg_drv_process();
+  }
+  PROCESS_END();
+}
+
 void zg_drv_process()
 {
-	// TX frame
 	if (tx_ready && !cnf_pending) {
 		zg_send(zg_buf, zg_buf_len);
 		tx_ready = 0;
 		cnf_pending = 1;
 	}
 
-	// process interrupt
 	if (intr_occured) {
 		zg_process_isr();
 	}
 
 	if (intr_valid) {
+		//printf("intr_valid %d\n", zg_buf[1]);
 		switch (zg_buf[1]) {
 		case ZG_MAC_TYPE_TXDATA_CONFIRM:
+			DEBUG_PRINT("ZG_MAC_TYPE_TXDATA_CONFIRM\n");
 			cnf_pending = 0;
 			break;
 		case ZG_MAC_TYPE_MGMT_CONFIRM:
+			DEBUG_PRINT("ZG_MAC_TYPE_MGMT_CONFIRM\n");
 			if (zg_buf[3] == ZG_RESULT_SUCCESS) {
 				switch (zg_buf[2]) {
 				case ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM\n");
 					mac[0] = zg_buf[7];
 					mac[1] = zg_buf[8];
 					mac[2] = zg_buf[9];
 					mac[3] = zg_buf[10];
 					mac[4] = zg_buf[11];
 					mac[5] = zg_buf[12];
+					DEBUG_PRINT("Wifi MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
 					zg_drv_state = DRV_STATE_SETUP_SECURITY;
 					break;
 				case ZG_MAC_SUBTYPE_MGMT_REQ_WEP_KEY:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_WEP_KEY\n");
 					zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
 					break;
 				case ZG_MAC_SUBTYPE_MGMT_REQ_CALC_PSK:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CALC_PSK\n");
 					memcpy(wpa_psk_key, ((zg_psk_calc_cnf_t*)&zg_buf[3])->psk, 32);
 					zg_drv_state = DRV_STATE_INSTALL_PSK;
 					break;
 				case ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY\n");
 					zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
 					break;
 				case ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE\n");
 					zg_drv_state = DRV_STATE_START_CONN;
 					break;
 				case ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT:
-					LEDConn_on();
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT\n");
+					//LEDConn_on();
 					zg_conn_status = 1;	// connected
 					break;
 				default:
+					DEBUG_PRINT("Unknown MAC subtype %d\n", zg_buf[2]);
 					break;
 				}
+			}else{
+				zg_drv_state = DRV_STATE_INIT;
+				DEBUG_PRINT("request failed!\n");
 			}
 			break;
 		case ZG_MAC_TYPE_RXDATA_INDICATE:
+			DEBUG_PRINT("ZG_MAC_TYPE_RXDATA_INDICATE\n");
 			zg_drv_state = DRV_STATE_PROCESS_RX;
 			break;
 		case ZG_MAC_TYPE_MGMT_INDICATE:
+			DEBUG_PRINT("ZG_MAC_TYPE_MGMT_INDICATE\n");
 			switch (zg_buf[2]) {
 			case ZG_MAC_SUBTYPE_MGMT_IND_DISASSOC:
 			case ZG_MAC_SUBTYPE_MGMT_IND_DEAUTH:
-				LEDConn_off();
+				DEBUG_PRINT("Wifi Disconnected!\n");
+				//LEDConn_off();
 				zg_conn_status = 0;	// lost connection
 
 				//try to reconnect
@@ -458,11 +490,12 @@ void zg_drv_process()
 					U16 status = (((U16)(zg_buf[3]))<<8)|zg_buf[4];
 
 					if (status == 1 || status == 5) {
-						LEDConn_off();
+						DEBUG_PRINT("Wifi Disconnected!\n");
+						//LEDConn_off();
 						zg_conn_status = 0;	// not connected
 					}
 					else if (status == 2 || status == 6) {
-						LEDConn_on();
+						//LEDConn_on();
 						zg_conn_status = 1;	// connected
 					}
 				}
@@ -476,9 +509,11 @@ void zg_drv_process()
 
 	switch (zg_drv_state) {
 	case DRV_STATE_INIT:
+		DEBUG_PRINT("DRV_STATE_INIT\n");
 		zg_drv_state = DRV_STATE_GET_MAC;
 		break;
 	case DRV_STATE_GET_MAC:
+		DEBUG_PRINT("DRV_STATE_GET_MAC\n");
 		// get MAC address
 		zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
 		zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
@@ -486,13 +521,13 @@ void zg_drv_process()
 		zg_buf[3] = 0;
 		zg_buf[4] = ZG_PARAM_MAC_ADDRESS;
 		spi_transfer(zg_buf, 5, 1);
-
 		zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
 		spi_transfer(zg_buf, 1, 1);
 
 		zg_drv_state = DRV_STATE_IDLE;
 		break;
 	case DRV_STATE_SETUP_SECURITY:
+		DEBUG_PRINT("DRV_STATE_SETUP_SECURITY\n");
 		switch (security_type) {
 		case ZG_SECURITY_TYPE_NONE:
 			zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
@@ -529,6 +564,7 @@ void zg_drv_process()
 		}
 		break;
 	case DRV_STATE_INSTALL_PSK:
+		DEBUG_PRINT("DRV_STATE_INSTALL_PSK\n");
 		// Install the PSK key on G2100
 		zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
 		zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
@@ -542,6 +578,7 @@ void zg_drv_process()
 		zg_drv_state = DRV_STATE_IDLE;
 		break;
 	case DRV_STATE_ENABLE_CONN_MANAGE:
+		DEBUG_PRINT("DRV_STATE_ENABLE_CONN_MANAGE\n");
 		// enable connection manager
 		zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
 		zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
@@ -564,6 +601,7 @@ void zg_drv_process()
 		zg_drv_state = DRV_STATE_IDLE;
 		break;
 	case DRV_STATE_START_CONN:
+		DEBUG_PRINT("DRV_STATE_START_CONN\n");
 	{
 		zg_connect_req_t* cmd = (zg_connect_req_t*)&zg_buf[3];
 
@@ -577,6 +615,7 @@ void zg_drv_process()
 		cmd->ssidLen = ssid_len;
 		memset(cmd->ssid, 0, 32);
 		memcpy(cmd->ssid, ssid, ssid_len);
+		DEBUG_PRINT("Connecting with SSID: %s\n", cmd->ssid);
 
 		// units of 100 milliseconds
 		cmd->sleepDuration = 0;
@@ -595,12 +634,24 @@ void zg_drv_process()
 		break;
 	}
 	case DRV_STATE_PROCESS_RX:
+		DEBUG_PRINT("DRV_STATE_PROCESS_RX\n");
 		zg_recv(zg_buf, &zg_buf_len);
 		rx_ready = 1;
 
+		DEBUG_PRINT("length: %d\n", zg_buf_len);
+		// {int i;
+		// for(i=0;i<zg_buf_len;i++){
+		// 	printf("%c", zg_buf[i]);
+		// }
+		// printf("\n");
+		// }
+		packetbuf_copyfrom(zg_buf, zg_buf_len);
+		packetbuf_set_datalen(zg_buf_len);
+		NETSTACK_RDC.input();
 		zg_drv_state = DRV_STATE_IDLE;
 		break;
 	case DRV_STATE_IDLE:
+		// printf("DRV_STATE_IDLE\n");
 		break;
 	}
 }

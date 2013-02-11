@@ -49,6 +49,7 @@ PROCESS_THREAD(hello_world_process, ev, data)
   PROCESS_BEGIN();
 
   printf("Hello, world\n");
+  //while(1);
   
   PROCESS_END();
 }
