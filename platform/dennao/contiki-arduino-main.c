@@ -49,7 +49,7 @@
 #include "dev/serial-line.h"
 #include "dev/slip.h"
 
-#include "radio/mrf24wb0ma/mrf24wb0ma.h"
+#include "watchdog.h"
 #include "contiki-conf.h"
 #include "dhcp.h"
 #include "net/uip-driver.h"
@@ -72,28 +72,17 @@ PROCINIT(&etimer_process, &serial_line_process);
 void
 init_lowlevel(void)
 {
-  rs232_init(USART_PORT, USART_BAUD,
-             USART_PARITY_NONE | USART_STOP_BITS_1 | USART_DATA_BITS_8);
-
-//#if WITH_UIP || WITH_UIP6
-  /* Initialise SPLIP on USART port */
-//  slip_arch_init(SLIP_BAUD);
-//#else
-  /* Redirect stdout and stdin to USART port */
+  rs232_init(USART_PORT, USART_BAUD, USART_PARITY_NONE | USART_STOP_BITS_1 | USART_DATA_BITS_8);
   rs232_redirect_stdout(USART_PORT);
   rs232_set_input(USART_PORT, serial_line_input_byte);
-//#endif
-
 }
 
 
 int main(void)
 {
   //calibrate_rc_osc_32k(); //CO: Had to comment this out
-
   /* Initialize hardware */
   init_lowlevel();
-
   /* Clock */
   clock_init();
 
@@ -102,7 +91,6 @@ int main(void)
 
   /* Register initial processes */
   procinit_init();
-
 
   //Give ourselves a prefix
   //init_net();
@@ -115,45 +103,9 @@ int main(void)
   /* Make pin 5 on port B an input (PB5 SCK/PCINT5) */
   PORTB &= ~(1<<5);
   serial_line_init();
-
   printf_P(PSTR("\r\n********BOOTING CONTIKI*********\r\n"));
-  printf("sizeof(zg_rx_data_ind_t): %d \n", sizeof(zg_rx_data_ind_t));
 
-  wifi_set_ssid("Jimmy");
-  wifi_set_passphrase("jimmy12345orz");
-  wifi_set_mode(WIRELESS_MODE_INFRA);
-  wifi_set_security_type(ZG_SECURITY_TYPE_WPA2);
-  // wifi_set_ssid("JimmyTest");
-  // wifi_set_passphrase("jimmy12345orz");
-  // wifi_set_mode(WIRELESS_MODE_ADHOC);
-  // wifi_set_security_type(ZG_SECURITY_TYPE_NONE);
-  queuebuf_init();
-  NETSTACK_RADIO.init();
-  NETSTACK_RDC.init();
-  NETSTACK_MAC.init();
-  NETSTACK_NETWORK.init();
-  wifi_connect();
-  process_start(&mrf24wb0ma_process,NULL);
-  struct uip_eth_addr addr;
-  wifi_getMAC(addr.addr);
-  uip_setethaddr(addr);
-  uip_arp_init();
-
-  printf("%s %lu %u\n",
-         NETSTACK_RDC.name,
-         CLOCK_SECOND / (NETSTACK_RDC.channel_check_interval() == 0? 1:
-                         NETSTACK_RDC.channel_check_interval()),
-         RF_CHANNEL);
-  /* Autostart processes */
   autostart_start(autostart_processes);
-
-  printf("MAC:%s\nRDC:%s\nNETWORK:%s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
-  #if WITH_UIP
-  /* IPv4 CONFIGURATION */
-    process_start(&tcpip_process, NULL);
-    //process_start(&uip_fw_process, NULL);
-    process_start(&dhcp_process, NULL);
-  #endif /* WITH_UIP */
   printf_P(PSTR("System online.\r\n"));
   watchdog_start();
   do {

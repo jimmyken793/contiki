@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, Swedish Institute of Computer Science.
+ * Copyright (c) 2007, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,35 +32,17 @@
 
 /**
  * \file
- *         A very simple Contiki application showing how Contiki programs look
+ *         A MAC protocol implementation that does not do anything.
  * \author
  *         Adam Dunkels <adam@sics.se>
  */
 
-#include "contiki.h"
-#include "radio/g2100.h"
+#ifndef __ETHERNET_RDC_H__
+#define __ETHERNET_RDC_H__
 
-#include <stdio.h> /* For printf() */
-/*---------------------------------------------------------------------------*/
-PROCESS(hello_world_process, "Hello world process");
-AUTOSTART_PROCESSES(&hello_world_process);
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(hello_world_process, ev, data)
-{
-	PROCESS_BEGIN();
+#include "net/mac/rdc.h"
+#include "dev/radio.h"
 
-	wifi_set_ssid("Mobile Phone Lab");
-	wifi_set_passphrase("androidiphone");
-	wifi_set_mode(WIRELESS_MODE_INFRA);
-	wifi_set_security_type(ZG_SECURITY_TYPE_WPA2);
-	// wifi_set_ssid("JimmyTest");
-	// wifi_set_passphrase("jimmy12345orz");
-	// wifi_set_mode(WIRELESS_MODE_ADHOC);
-	// wifi_set_security_type(ZG_SECURITY_TYPE_NONE);
-	wifi_connect();
-	printf("Hello, world\n");
-	//while(1);
+extern const struct rdc_driver ethernet_rdc_driver;
 
-	PROCESS_END();
-}
-/*---------------------------------------------------------------------------*/
+#endif /* __ETHERNET_RDC_H__ */

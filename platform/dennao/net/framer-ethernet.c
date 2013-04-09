@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, Swedish Institute of Computer Science.
+ * Copyright (c) 2009, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,41 +26,68 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * This file is part of the Contiki operating system.
- *
  */
 
 /**
  * \file
- *         A very simple Contiki application showing how Contiki programs look
+ *         MAC framer for nullmac
  * \author
- *         Adam Dunkels <adam@sics.se>
+ *         Niclas Finne <nfi@sics.se>
+ *         Joakim Eriksson <joakime@sics.se>
  */
+#include <string.h>
+#include "net/framer-ethernet.h"
+#include "net/packetbuf.h"
+#include "net/uip_arp.h"
 
-#include "contiki.h"
-#include "radio/g2100.h"
+#define DEBUG 0
 
-#include <stdio.h> /* For printf() */
+#if DEBUG
+#include <stdio.h>
+#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTADDR(addr) PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7])
+#else
+#define PRINTF(...)
+#define PRINTADDR(addr)
+#endif
+static const struct uip_eth_addr broadcast_ethaddr =
+  {{0xff,0xff,0xff,0xff,0xff,0xff}};
 /*---------------------------------------------------------------------------*/
-PROCESS(hello_world_process, "Hello world process");
-AUTOSTART_PROCESSES(&hello_world_process);
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(hello_world_process, ev, data)
+static int
+create(void)
 {
-	PROCESS_BEGIN();
+  struct uip_eth_hdr *hdr;
 
-	wifi_set_ssid("Mobile Phone Lab");
-	wifi_set_passphrase("androidiphone");
-	wifi_set_mode(WIRELESS_MODE_INFRA);
-	wifi_set_security_type(ZG_SECURITY_TYPE_WPA2);
-	// wifi_set_ssid("JimmyTest");
-	// wifi_set_passphrase("jimmy12345orz");
-	// wifi_set_mode(WIRELESS_MODE_ADHOC);
-	// wifi_set_security_type(ZG_SECURITY_TYPE_NONE);
-	wifi_connect();
-	printf("Hello, world\n");
-	//while(1);
-
-	PROCESS_END();
+  if(packetbuf_hdralloc(sizeof(struct uip_eth_hdr))) {
+    hdr = packetbuf_hdrptr();
+    memcpy(&(hdr->src), &uip_ethaddr, 6);
+    memcpy(&(hdr->dest), &broadcast_ethaddr, 6);
+    hdr->type = 0x08;
+    return sizeof(struct uip_eth_hdr);
+  }
+  PRINTF("PNULLMAC-UT: too large header: %u\n", len);
+  return FRAMER_FAILED;
 }
 /*---------------------------------------------------------------------------*/
+static int
+parse(void)
+{
+  struct uip_eth_hdr *hdr;
+  hdr = packetbuf_dataptr();
+  if(packetbuf_hdrreduce(sizeof(struct uip_eth_hdr))) {
+    packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &(hdr->src));
+    packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &(hdr->dest));
+
+    PRINTF("PNULLMAC-IN: ");
+    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER));
+    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
+    PRINTF("%u (%u)\n", packetbuf_datalen(), len);
+
+    return sizeof(struct uip_eth_hdr);
+  }
+  return FRAMER_FAILED;
+}
+/*---------------------------------------------------------------------------*/
+const struct framer framer_ethernet = {
+  create, parse
+};

@@ -1,1 +1,1 @@
-include $(CONTIKI)/cpu/avr/radio/mrf24wb0ma/Makefile.mrf24wb0ma
+#include $(CONTIKI)/cpu/avr/radio/mrf24wb0ma/Makefile.mrf24wb0ma

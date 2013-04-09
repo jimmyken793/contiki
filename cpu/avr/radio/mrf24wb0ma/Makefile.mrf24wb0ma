@@ -1,2 +1,0 @@
-CONTIKI_CPU_DIRS           += radio/mrf24wb0ma
-CONTIKI_TARGET_SOURCEFILES += mrf24wb0ma.c g2100.c

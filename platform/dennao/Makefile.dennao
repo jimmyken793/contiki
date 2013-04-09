@@ -1,11 +1,11 @@
-CONTIKI_TARGET_DIRS = . apps net loader
+CONTIKI_TARGET_DIRS = . apps net loader radio
 CONTIKI_CORE=contiki-rcb-main
 CONTIKI_TARGET_MAIN = ${CONTIKI_CORE}.o
 
 NETWORK_DRIVER = uip-driver.c
 
 CONTIKI_TARGET_SOURCEFILES +=	rs232.c cfs-eeprom.c eeprom.c random.c WInterrupts.c \
-				mmem.c contiki-arduino-main.c slip.c mrf24wb0ma.c $(NETWORK_DRIVER)
+				mmem.c contiki-arduino-main.c slip.c mrf24wb0ma.c $(NETWORK_DRIVER) g2100.c
 
 CONTIKIAVR=$(CONTIKI)/cpu/avr
 CONTIKIBOARD=.
@@ -33,8 +33,6 @@ AVRDUDE_OPTIONS=-V
 
 
 include $(CONTIKIAVR)/Makefile.avr
-include $(CONTIKIAVR)/radio/Makefile.radio
-
 
 hello-world.hex: hello-world.$(TARGET)
 	avr-objcopy hello-world.$(TARGET) -j .text -j .data -O ihex hello-world.hex

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Swedish Institute of Computer Science.
+ * Copyright (c) 2007, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,68 +26,64 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * This file is part of the Contiki operating system.
+ *
  */
 
 /**
  * \file
- *         MAC framer for nullmac
+ *         A MAC protocol that does not do anything.
  * \author
- *         Niclas Finne <nfi@sics.se>
- *         Joakim Eriksson <joakime@sics.se>
+ *         Adam Dunkels <adam@sics.se>
  */
 
-#include "net/mac/framer-ethernet.h"
+#include "net/ethernet-mac.h"
 #include "net/packetbuf.h"
-#include "net/uip_arp.h"
+#include "net/netstack.h"
 
-#define DEBUG 0
-
-#if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
-#define PRINTADDR(addr) PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7])
-#else
-#define PRINTF(...)
-#define PRINTADDR(addr)
-#endif
-static const struct uip_eth_addr broadcast_ethaddr =
-  {{0xff,0xff,0xff,0xff,0xff,0xff}};
 /*---------------------------------------------------------------------------*/
-static int
-create(void)
+static void
+send_packet(mac_callback_t sent, void *ptr)
 {
-  struct uip_eth_hdr *hdr;
-
-  if(packetbuf_hdralloc(sizeof(struct uip_eth_hdr))) {
-    hdr = packetbuf_hdrptr();
-    memcpy(&(hdr->src), &uip_ethaddr, 6);
-    memcpy(&(hdr->dest), &broadcast_ethaddr, 6);
-    hdr->type = 0x08;
-    return sizeof(struct uip_eth_hdr);
-  }
-  PRINTF("PNULLMAC-UT: too large header: %u\n", len);
-  return FRAMER_FAILED;
+  NETSTACK_RDC.send(sent, ptr);
+}
+/*---------------------------------------------------------------------------*/
+static void
+packet_input(void)
+{
+  NETSTACK_NETWORK.input();
 }
 /*---------------------------------------------------------------------------*/
 static int
-parse(void)
+on(void)
 {
-  struct uip_eth_hdr *hdr;
-  hdr = packetbuf_dataptr();
-  if(packetbuf_hdrreduce(sizeof(struct uip_eth_hdr))) {
-    packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &(hdr->src));
-    packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &(hdr->dest));
-
-    PRINTF("PNULLMAC-IN: ");
-    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER));
-    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
-    PRINTF("%u (%u)\n", packetbuf_datalen(), len);
-
-    return sizeof(struct uip_eth_hdr);
-  }
-  return FRAMER_FAILED;
+  return NETSTACK_RDC.on();
 }
 /*---------------------------------------------------------------------------*/
-const struct framer framer_ethernet = {
-  create, parse
+static int
+off(int keep_radio_on)
+{
+  return NETSTACK_RDC.off(keep_radio_on);
+}
+/*---------------------------------------------------------------------------*/
+static unsigned short
+channel_check_interval(void)
+{
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+static void
+init(void)
+{
+}
+/*---------------------------------------------------------------------------*/
+const struct mac_driver ethernet_mac_driver = {
+  "etnernet-mac",
+  init,
+  send_packet,
+  packet_input,
+  on,
+  off,
+  channel_check_interval,
 };
+/*---------------------------------------------------------------------------*/

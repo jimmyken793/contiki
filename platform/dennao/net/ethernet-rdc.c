@@ -37,50 +37,74 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#include "net/mac/ethernet-mac.h"
+#include "net/ethernet-rdc.h"
 #include "net/packetbuf.h"
+#include "net/queuebuf.h"
 #include "net/netstack.h"
+#include "net/uip_arp.h"
+#include "radio/g2100.h"
+#include <string.h>
 
 /*---------------------------------------------------------------------------*/
 static void
-send_packet(mac_callback_t sent, void *ptr)
-{
-  NETSTACK_RDC.send(sent, ptr);
+send_packet(mac_callback_t sent, void *ptr){
+  int ret;
+  rimeaddr_t addr;
+  wifi_getMAC((uint8_t*)&addr);
+  packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &addr);
+  if(NETSTACK_FRAMER.create() > 0) {
+    if(NETSTACK_RADIO.send(packetbuf_hdrptr(), packetbuf_totlen()) == RADIO_TX_OK) {
+      ret = MAC_TX_OK;
+    } else {
+      ret =  MAC_TX_ERR;
+    }
+    mac_call_sent_callback(sent, ptr, ret, 1);
+  }
 }
 /*---------------------------------------------------------------------------*/
 static void
-packet_input(void)
-{
-  NETSTACK_NETWORK.input();
+send_list(mac_callback_t sent, void *ptr, struct rdc_buf_list *buf_list){
+  if(buf_list != NULL) {
+    queuebuf_to_packetbuf(buf_list->buf);
+    send_packet(sent, ptr);
+  }
+}
+/*---------------------------------------------------------------------------*/
+static void
+packet_input(void){
+  NETSTACK_MAC.input();
 }
 /*---------------------------------------------------------------------------*/
 static int
-on(void)
-{
-  return NETSTACK_RDC.on();
+on(void){
+  return NETSTACK_RADIO.on();
 }
 /*---------------------------------------------------------------------------*/
 static int
-off(int keep_radio_on)
-{
-  return NETSTACK_RDC.off(keep_radio_on);
+off(int keep_radio_on){
+  if(keep_radio_on) {
+    return NETSTACK_RADIO.on();
+  } else {
+    return NETSTACK_RADIO.off();
+  }
 }
 /*---------------------------------------------------------------------------*/
 static unsigned short
-channel_check_interval(void)
-{
+channel_check_interval(void){
   return 0;
 }
 /*---------------------------------------------------------------------------*/
 static void
 init(void)
 {
+  on();
 }
 /*---------------------------------------------------------------------------*/
-const struct mac_driver ethernet_mac_driver = {
-  "etnernet-mac",
+const struct rdc_driver ethernet_rdc_driver = {
+  "nullrdc-noframer",
   init,
   send_packet,
+  send_list,
   packet_input,
   on,
   off,

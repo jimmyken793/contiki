@@ -38,6 +38,10 @@
 #include <avr/io.h> 
 #include "dev/spi.h"
 #include "contiki-conf.h"
+#include "uip.h"
+#include "uip_arp.h"
+#include "dhcp.h"
+#include "queuebuf.h"
 #include "dennao_interrupt.h"
 #include "process.h"
 #include "g2100.h"
@@ -94,12 +98,25 @@ void wifi_set_passphrase(char* new_passphrase){
 }
 
 void wifi_connect(){
+	queuebuf_init();
+	NETSTACK_RADIO.init();
+	NETSTACK_RDC.init();
+	NETSTACK_MAC.init();
+	NETSTACK_NETWORK.init();
 	printf("waiting for wifi connection...\n");
 	while(zg_get_conn_state() != 1) {
 		zg_drv_process();
 	}
 	printf("wifi connection established\n");
+	process_start(&mrf24wb0ma_process,NULL);
+	struct uip_eth_addr addr;
+	wifi_getMAC(addr.addr);
+	uip_setethaddr(addr);
+	uip_arp_init();
+	process_start(&tcpip_process, NULL);
+	process_start(&dhcp_process, NULL);
 }
+
 
 void wifi_prepare_payload(char* buf, U16 len){
 	memcpy(zg_buf, buf, len);
@@ -117,8 +134,7 @@ void wifi_getMAC(uint8_t* d){
 	memcpy(d,mac,sizeof(mac));
 }
 
-void zg_init()
-{
+void zg_init(){
 	U8 clr;
 	spi_init();
 	clr = SPSR;
@@ -140,8 +156,7 @@ void zg_init()
 
 }
 
-void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs)
-{
+void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs){
 	U16 i;
 	ZG2100_CSoff();
 
@@ -156,8 +171,7 @@ void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs)
 	return;
 }
 
-void zg_chip_reset()
-{
+void zg_chip_reset(){
 	// write reset register addr
 	hdr[0] = ZG_INDEX_ADDR_REG;
 	hdr[1] = 0x00;
@@ -199,8 +213,7 @@ void zg_chip_reset()
 	} while((hdr[1] == 0) && (hdr[2] == 0));
 }
 
-void zg_interrupt2_reg()
-{
+void zg_interrupt2_reg(){
 	// read the interrupt2 mask register
 	hdr[0] = 0x40 | ZG_INTR2_MASK_REG;
 	hdr[1] = 0x00;
@@ -219,13 +232,11 @@ void zg_interrupt2_reg()
 	return;
 }
 
-void zg_interrupt_reg(U8 mask, U8 state)
-{
+void zg_interrupt_reg(U8 mask, U8 state){
 	// read the interrupt register
 	hdr[0] = 0x40 | ZG_INTR_MASK_REG;
 	hdr[1] = 0x00;
 	spi_transfer(hdr, 2, 1);
-
 	// now regBuf[0] contains the current setting for the
 	// interrupt mask register
 	// this is to clear any currently set interrupts of interest
@@ -233,20 +244,16 @@ void zg_interrupt_reg(U8 mask, U8 state)
 	hdr[2] = (hdr[1] & ~mask) | ( (state == 0)? 0 : mask );
 	hdr[1] = mask;
 	spi_transfer(hdr, 3, 1);
-
-	return;
 }
 
-void zg_isr()
-{
+void zg_isr(){
 	//printf("interrupt!\n");
 	ZG2100_ISR_DISABLE();
 	intr_occured = 1;
 	process_poll(&mrf24wb0ma_process);
 }
 
-void zg_process_isr()
-{
+void zg_process_isr(){
 	U8 next_cmd = 0;
 
 	hdr[0] = 0x40 | ZG_INTR_REG;
@@ -284,8 +291,7 @@ void zg_process_isr()
 	ZG2100_ISR_ENABLE();
 }
 
-void zg_send(U8* buf, U16 len)
-{
+void zg_send(U8* buf, U16 len){
 	hdr[0] = ZG_CMD_WT_FIFO_DATA;
 	hdr[1] = ZG_MAC_TYPE_TXDATA_REQ;
 	hdr[2] = ZG_MAC_SUBTYPE_TXDATA_REQ_STD;
@@ -303,8 +309,7 @@ void zg_send(U8* buf, U16 len)
 	spi_transfer(hdr, 1, 1);
 }
 
-void zg_recv(U8* buf, U16* len)
-{
+void zg_recv(U8* buf, U16* len){
 	zg_rx_data_ind_t* ptr = (zg_rx_data_ind_t*)&(zg_buf[3]);
 	*len = ZGSTOHS( ptr->dataLen );
 
@@ -404,131 +409,92 @@ PROCESS_THREAD(mrf24wb0ma_process, ev, data)
   PROCESS_END();
 }
 
-void zg_drv_process()
-{
-	if (tx_ready && !cnf_pending) {
-		zg_send(zg_buf, zg_buf_len);
-		tx_ready = 0;
-		cnf_pending = 1;
+void drv_assign_mac(U8* mac_in){
+	mac[0] = mac_in[7];
+	mac[1] = mac_in[8];
+	mac[2] = mac_in[9];
+	mac[3] = mac_in[10];
+	mac[4] = mac_in[11];
+	mac[5] = mac_in[12];
+}
+
+void drv_start_connection(){
+	zg_connect_req_t* cmd = (zg_connect_req_t*)&zg_buf[3];
+
+	// start connection to AP
+	zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
+	zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
+	zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT;
+
+	cmd->secType = security_type;
+
+	cmd->ssidLen = ssid_len;
+	memset(cmd->ssid, 0, 32);
+	memcpy(cmd->ssid, ssid, ssid_len);
+	DEBUG_PRINT("Connecting with SSID: %s\n", cmd->ssid);
+
+	// units of 100 milliseconds
+	cmd->sleepDuration = 0;
+
+	if (wireless_mode == WIRELESS_MODE_INFRA){
+		cmd->modeBss = 1;
+	}else if(wireless_mode == WIRELESS_MODE_ADHOC){
+		cmd->modeBss = 2;
 	}
 
-	if (intr_occured) {
-		zg_process_isr();
-	}
+	spi_transfer(zg_buf, ZG_CONNECT_REQ_SIZE+3, 1);
 
-	if (intr_valid) {
-		//printf("intr_valid %d\n", zg_buf[1]);
-		switch (zg_buf[1]) {
-		case ZG_MAC_TYPE_TXDATA_CONFIRM:
-			DEBUG_PRINT("ZG_MAC_TYPE_TXDATA_CONFIRM\n");
-			cnf_pending = 0;
-			break;
-		case ZG_MAC_TYPE_MGMT_CONFIRM:
-			DEBUG_PRINT("ZG_MAC_TYPE_MGMT_CONFIRM\n");
-			if (zg_buf[3] == ZG_RESULT_SUCCESS) {
-				switch (zg_buf[2]) {
-				case ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM:
-					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM\n");
-					mac[0] = zg_buf[7];
-					mac[1] = zg_buf[8];
-					mac[2] = zg_buf[9];
-					mac[3] = zg_buf[10];
-					mac[4] = zg_buf[11];
-					mac[5] = zg_buf[12];
-					DEBUG_PRINT("Wifi MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
-					zg_drv_state = DRV_STATE_SETUP_SECURITY;
-					break;
-				case ZG_MAC_SUBTYPE_MGMT_REQ_WEP_KEY:
-					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_WEP_KEY\n");
-					zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
-					break;
-				case ZG_MAC_SUBTYPE_MGMT_REQ_CALC_PSK:
-					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CALC_PSK\n");
-					memcpy(wpa_psk_key, ((zg_psk_calc_cnf_t*)&zg_buf[3])->psk, 32);
-					zg_drv_state = DRV_STATE_INSTALL_PSK;
-					break;
-				case ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY:
-					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY\n");
-					zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
-					break;
-				case ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE:
-					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE\n");
-					zg_drv_state = DRV_STATE_START_CONN;
-					break;
-				case ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT:
-					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT\n");
-					//LEDConn_on();
-					zg_conn_status = 1;	// connected
-					break;
-				default:
-					DEBUG_PRINT("Unknown MAC subtype %d\n", zg_buf[2]);
-					break;
-				}
-			}else{
-				zg_drv_state = DRV_STATE_INIT;
-				DEBUG_PRINT("request failed!\n");
-			}
-			break;
-		case ZG_MAC_TYPE_RXDATA_INDICATE:
-			DEBUG_PRINT("ZG_MAC_TYPE_RXDATA_INDICATE\n");
-			zg_drv_state = DRV_STATE_PROCESS_RX;
-			break;
-		case ZG_MAC_TYPE_MGMT_INDICATE:
-			DEBUG_PRINT("ZG_MAC_TYPE_MGMT_INDICATE\n");
-			switch (zg_buf[2]) {
-			case ZG_MAC_SUBTYPE_MGMT_IND_DISASSOC:
-			case ZG_MAC_SUBTYPE_MGMT_IND_DEAUTH:
-				DEBUG_PRINT("Wifi Disconnected!\n");
-				//LEDConn_off();
-				zg_conn_status = 0;	// lost connection
+	zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
+	spi_transfer(zg_buf, 1, 1);
 
-				//try to reconnect
-				zg_drv_state = DRV_STATE_START_CONN;
-				break;
-			case ZG_MAC_SUBTYPE_MGMT_IND_CONN_STATUS:
-				{
-					U16 status = (((U16)(zg_buf[3]))<<8)|zg_buf[4];
+	zg_drv_state = DRV_STATE_IDLE;
+}
+void drv_install_psk(){
+	// Install the PSK key on G2100
+	zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
+	zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
+	zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY;
+	zg_write_psk_key(&zg_buf[3]);
+	spi_transfer(zg_buf, ZG_PMK_KEY_REQ_SIZE+3, 1);
 
-					if (status == 1 || status == 5) {
-						DEBUG_PRINT("Wifi Disconnected!\n");
-						//LEDConn_off();
-						zg_conn_status = 0;	// not connected
-					}
-					else if (status == 2 || status == 6) {
-						//LEDConn_on();
-						zg_conn_status = 1;	// connected
-					}
-				}
-				break;
-			}
-			break;
-		}
+	zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
+	spi_transfer(zg_buf, 1, 1);
 
-		intr_valid = 0;
-	}
+	zg_drv_state = DRV_STATE_IDLE;
+}
 
-	switch (zg_drv_state) {
-	case DRV_STATE_INIT:
-		DEBUG_PRINT("DRV_STATE_INIT\n");
-		zg_drv_state = DRV_STATE_GET_MAC;
-		break;
-	case DRV_STATE_GET_MAC:
-		DEBUG_PRINT("DRV_STATE_GET_MAC\n");
-		// get MAC address
-		zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
-		zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
-		zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM;
-		zg_buf[3] = 0;
-		zg_buf[4] = ZG_PARAM_MAC_ADDRESS;
-		spi_transfer(zg_buf, 5, 1);
-		zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
-		spi_transfer(zg_buf, 1, 1);
+void drv_process_rx(){	
+	zg_recv(zg_buf, &zg_buf_len);
+	rx_ready = 1;
+	packetbuf_copyfrom(zg_buf, zg_buf_len);
+	packetbuf_set_datalen(zg_buf_len);
+	NETSTACK_RDC.input();
 
-		zg_drv_state = DRV_STATE_IDLE;
-		break;
-	case DRV_STATE_SETUP_SECURITY:
-		DEBUG_PRINT("DRV_STATE_SETUP_SECURITY\n");
-		switch (security_type) {
+	zg_drv_state = DRV_STATE_IDLE;
+}
+
+void drv_enable_connection_manager(){
+	// enable connection manager
+	zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
+	zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
+	zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE;
+	zg_buf[3] = 0x01;	// 0x01 - enable; 0x00 - disable
+	zg_buf[4] = 10;		// num retries to reconnect
+	zg_buf[5] = 0x10 | 0x02 | 0x01;	// 0x10 -	enable start and stop indication messages
+									// 		 	from G2100 during reconnection
+									// 0x02 -	start reconnection on receiving a deauthentication
+									// 			message from the AP
+									// 0x01 -	start reconnection when the missed beacon count
+									// 			exceeds the threshold. uses default value of
+									//			100 missed beacons if not set during initialization
+	zg_buf[6] = 0;
+	spi_transfer(zg_buf, 7, 1);
+	zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
+	spi_transfer(zg_buf, 1, 1);
+	zg_drv_state = DRV_STATE_IDLE;
+}
+void drv_setup_security(){
+	switch (security_type) {
 		case ZG_SECURITY_TYPE_NONE:
 			zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
 			break;
@@ -561,97 +527,141 @@ void zg_drv_process()
 			break;
 		default:
 			break;
-		}
-		break;
-	case DRV_STATE_INSTALL_PSK:
-		DEBUG_PRINT("DRV_STATE_INSTALL_PSK\n");
-		// Install the PSK key on G2100
-		zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
-		zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
-		zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY;
-		zg_write_psk_key(&zg_buf[3]);
-		spi_transfer(zg_buf, ZG_PMK_KEY_REQ_SIZE+3, 1);
-
-		zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
-		spi_transfer(zg_buf, 1, 1);
-
-		zg_drv_state = DRV_STATE_IDLE;
-		break;
-	case DRV_STATE_ENABLE_CONN_MANAGE:
-		DEBUG_PRINT("DRV_STATE_ENABLE_CONN_MANAGE\n");
-		// enable connection manager
-		zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
-		zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
-		zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE;
-		zg_buf[3] = 0x01;	// 0x01 - enable; 0x00 - disable
-		zg_buf[4] = 10;		// num retries to reconnect
-		zg_buf[5] = 0x10 | 0x02 | 0x01;	// 0x10 -	enable start and stop indication messages
-										// 		 	from G2100 during reconnection
-										// 0x02 -	start reconnection on receiving a deauthentication
-										// 			message from the AP
-										// 0x01 -	start reconnection when the missed beacon count
-										// 			exceeds the threshold. uses default value of
-										//			100 missed beacons if not set during initialization
-		zg_buf[6] = 0;
-		spi_transfer(zg_buf, 7, 1);
-
-		zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
-		spi_transfer(zg_buf, 1, 1);
-
-		zg_drv_state = DRV_STATE_IDLE;
-		break;
-	case DRV_STATE_START_CONN:
-		DEBUG_PRINT("DRV_STATE_START_CONN\n");
-	{
-		zg_connect_req_t* cmd = (zg_connect_req_t*)&zg_buf[3];
-
-		// start connection to AP
-		zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
-		zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
-		zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT;
-
-		cmd->secType = security_type;
-
-		cmd->ssidLen = ssid_len;
-		memset(cmd->ssid, 0, 32);
-		memcpy(cmd->ssid, ssid, ssid_len);
-		DEBUG_PRINT("Connecting with SSID: %s\n", cmd->ssid);
-
-		// units of 100 milliseconds
-		cmd->sleepDuration = 0;
-
-		if (wireless_mode == WIRELESS_MODE_INFRA)
-			cmd->modeBss = 1;
-		else if (wireless_mode == WIRELESS_MODE_ADHOC)
-			cmd->modeBss = 2;
-
-		spi_transfer(zg_buf, ZG_CONNECT_REQ_SIZE+3, 1);
-
-		zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
-		spi_transfer(zg_buf, 1, 1);
-
-		zg_drv_state = DRV_STATE_IDLE;
-		break;
 	}
-	case DRV_STATE_PROCESS_RX:
-		DEBUG_PRINT("DRV_STATE_PROCESS_RX\n");
-		zg_recv(zg_buf, &zg_buf_len);
-		rx_ready = 1;
+}
 
-		DEBUG_PRINT("length: %d\n", zg_buf_len);
-		// {int i;
-		// for(i=0;i<zg_buf_len;i++){
-		// 	printf("%c", zg_buf[i]);
-		// }
-		// printf("\n");
-		// }
-		packetbuf_copyfrom(zg_buf, zg_buf_len);
-		packetbuf_set_datalen(zg_buf_len);
-		NETSTACK_RDC.input();
-		zg_drv_state = DRV_STATE_IDLE;
-		break;
-	case DRV_STATE_IDLE:
-		// printf("DRV_STATE_IDLE\n");
-		break;
+void drv_get_mac(){
+	zg_buf[0] = ZG_CMD_WT_FIFO_MGMT;
+	zg_buf[1] = ZG_MAC_TYPE_MGMT_REQ;
+	zg_buf[2] = ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM;
+	zg_buf[3] = 0;
+	zg_buf[4] = ZG_PARAM_MAC_ADDRESS;
+	spi_transfer(zg_buf, 5, 1);
+	zg_buf[0] = ZG_CMD_WT_FIFO_DONE;
+	spi_transfer(zg_buf, 1, 1);
+
+	zg_drv_state = DRV_STATE_IDLE;
+}
+
+void zg_drv_process()
+{
+	if (tx_ready && !cnf_pending) {
+		zg_send(zg_buf, zg_buf_len);
+		tx_ready = 0;
+		cnf_pending = 1;
+	}
+
+	if (intr_occured) {
+		zg_process_isr();
+	}
+
+	if (intr_valid) {
+		//printf("intr_valid %d\n", zg_buf[1]);
+		switch (zg_buf[1]) {
+		case ZG_MAC_TYPE_TXDATA_CONFIRM:
+			DEBUG_PRINT("ZG_MAC_TYPE_TXDATA_CONFIRM\n");
+			cnf_pending = 0;
+			break;
+		case ZG_MAC_TYPE_MGMT_CONFIRM:
+			DEBUG_PRINT("ZG_MAC_TYPE_MGMT_CONFIRM\n");
+			if (zg_buf[3] == ZG_RESULT_SUCCESS) {
+				switch (zg_buf[2]) {
+				case ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_GET_PARAM\n");
+					drv_assign_mac(zg_buf);
+					zg_drv_state = DRV_STATE_SETUP_SECURITY;
+					break;
+				case ZG_MAC_SUBTYPE_MGMT_REQ_WEP_KEY:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_WEP_KEY\n");
+					zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
+					break;
+				case ZG_MAC_SUBTYPE_MGMT_REQ_CALC_PSK:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CALC_PSK\n");
+					memcpy(wpa_psk_key, ((zg_psk_calc_cnf_t*)&zg_buf[3])->psk, 32);
+					zg_drv_state = DRV_STATE_INSTALL_PSK;
+					break;
+				case ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_PMK_KEY\n");
+					zg_drv_state = DRV_STATE_ENABLE_CONN_MANAGE;
+					break;
+				case ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT_MANAGE\n");
+					zg_drv_state = DRV_STATE_START_CONN;
+					break;
+				case ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT:
+					DEBUG_PRINT("ZG_MAC_SUBTYPE_MGMT_REQ_CONNECT\n");
+					zg_conn_status = 1;
+					break;
+				default:
+					DEBUG_PRINT("Unknown MAC subtype %d\n", zg_buf[2]);
+					break;
+				}
+			}else{
+				zg_drv_state = DRV_STATE_INIT;
+				DEBUG_PRINT("request failed!\n");
+			}
+			break;
+		case ZG_MAC_TYPE_RXDATA_INDICATE:
+			DEBUG_PRINT("ZG_MAC_TYPE_RXDATA_INDICATE\n");
+			zg_drv_state = DRV_STATE_PROCESS_RX;
+			break;
+		case ZG_MAC_TYPE_MGMT_INDICATE:
+			DEBUG_PRINT("ZG_MAC_TYPE_MGMT_INDICATE\n");
+			switch (zg_buf[2]) {
+			case ZG_MAC_SUBTYPE_MGMT_IND_DISASSOC:
+			case ZG_MAC_SUBTYPE_MGMT_IND_DEAUTH:
+				DEBUG_PRINT("Wifi Disconnected!\n");
+				zg_conn_status = 0;
+				zg_drv_state = DRV_STATE_START_CONN;
+				break;
+			case ZG_MAC_SUBTYPE_MGMT_IND_CONN_STATUS:
+				{
+					U16 status = (((U16)(zg_buf[3]))<<8)|zg_buf[4];
+					if(status == 1 || status == 5){
+						DEBUG_PRINT("Wifi Disconnected!\n");
+						zg_conn_status = 0;
+					}else if(status == 2 || status == 6) {
+						zg_conn_status = 1;
+					}
+				}
+				break;
+			}
+			break;
+		}
+
+		intr_valid = 0;
+	}
+
+	switch (zg_drv_state) {
+		case DRV_STATE_INIT:
+			DEBUG_PRINT("DRV_STATE_INIT\n");
+			zg_drv_state = DRV_STATE_GET_MAC;
+			break;
+		case DRV_STATE_GET_MAC:
+			DEBUG_PRINT("DRV_STATE_GET_MAC\n");
+			drv_get_mac();
+			break;
+		case DRV_STATE_SETUP_SECURITY:
+			DEBUG_PRINT("DRV_STATE_SETUP_SECURITY\n");
+			drv_setup_security();
+			break;
+		case DRV_STATE_INSTALL_PSK:
+			DEBUG_PRINT("DRV_STATE_INSTALL_PSK\n");
+			drv_install_psk();
+			break;
+		case DRV_STATE_ENABLE_CONN_MANAGE:
+			DEBUG_PRINT("DRV_STATE_ENABLE_CONN_MANAGE\n");
+			drv_enable_connection_manager();
+			break;
+		case DRV_STATE_START_CONN:
+			DEBUG_PRINT("DRV_STATE_START_CONN\n");
+			drv_start_connection();
+			break;
+		case DRV_STATE_PROCESS_RX:
+			DEBUG_PRINT("DRV_STATE_PROCESS_RX\n");
+			drv_process_rx();
+			break;
+		case DRV_STATE_IDLE:
+			break;
 	}
 }
