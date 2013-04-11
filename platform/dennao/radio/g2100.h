@@ -40,37 +40,17 @@
 #include "sys/process.h"
 #include "net/netstack.h"
 
-
 #define MAX_SSID_LENGTH 32
 #define MAX_PASSPHRASE_LENGTH 64
-void wifi_set_ssid(char* new_ssid);
-void wifi_set_passphrase(char* new_passphrase);
-void wifi_set_security_type(u8 type);
-void wifi_connect();
-void wifi_prepare_payload(char* buf, U16 len);
-void wifi_send();
-void wifi_set_mode(U8 mode);
-void wifi_getMAC(uint8_t* d);
 
-#define ZG2100_ISR_DISABLE()  (EIMSK &= ~(0x01))
-#define ZG2100_ISR_ENABLE()   (EIMSK |= 0x01)
-#define ZG2100_ISR_GET(X)   (X = EIMSK)
-#define ZG2100_ISR_SET(X)   (EIMSK = X)
+#define WIFI_ISR_DISABLE() (EIMSK &= ~(0x01))
+#define WIFI_ISR_ENABLE() (EIMSK |= 0x01)
 
-#define ZG2100_CSon()         (PORTB |= BV(CSN))
-#define ZG2100_CSoff()          (PORTB &= ~BV(CSN))
-
-#define DRV_STATE_INIT					0
-#define DRV_STATE_GET_MAC				2
-#define DRV_STATE_START_CONN			3
-#define DRV_STATE_PROCESS_RX			4
-#define DRV_STATE_IDLE					5
-#define DRV_STATE_SETUP_SECURITY		6
-#define DRV_STATE_INSTALL_PSK			7
-#define DRV_STATE_ENABLE_CONN_MANAGE	8
+#define WIFI_SS_ON() (PORTB |= BV(CSN))
+#define WIFI_SS_OFF() (PORTB &= ~BV(CSN))
 
 //Host to Zero G long
-#define HTOZGL(a) (	 ((a & 0x000000ff)<<24) \
+#define HTOZGL(a) ( ((a & 0x000000ff)<<24) \
 					|((a & 0x0000ff00)<<8)  \
 					|((a & 0x00ff0000)>>8)  \
 					|((a & 0xff000000)>>24)	)
@@ -81,7 +61,6 @@ void wifi_getMAC(uint8_t* d);
 #define ZGSTOHS(a) HSTOZGS(a)
 //#define HTONS(a) HSTOZGS(a)
 
-#define ZG_INTERRUPT_PIN	0	// Pin on Arduino
 
 // Command values which appear in ZG_PREAMBLE_CMD_IDX for each SPI message
 #define ZG_CMD_FIFO_ACCESS			(0x80)
@@ -142,21 +121,21 @@ enum {
     ZG_RESULT_ALREADY_ASSOC,
     ZG_RESULT_INSUFFICIENT_RSRCS,
     ZG_RESULT_TIMEOUT,
-    ZG_RESULT_BAD_EXCHANGE,	// frame exchange problem with peer (AP or STA)
-    ZG_RESULT_AUTH_REFUSED,		// authenticating node refused our request
-    ZG_RESULT_ASSOC_REFUSED,	// associating node refused our request
-    ZG_RESULT_REQ_IN_PROGRESS,	// only one mlme request at a time allowed
-    ZG_RESULT_NOT_JOINED,			// operation requires that device be joined
-    								// with target
-    ZG_RESULT_NOT_ASSOC,			// operation requires that device be
-    								// associated with target
-    ZG_RESULT_NOT_AUTH,				// operation requires that device be
-    								// authenticated with target
+    ZG_RESULT_BAD_EXCHANGE,     // frame exchange problem with peer (AP or STA)
+    ZG_RESULT_AUTH_REFUSED,     // authenticating node refused our request
+    ZG_RESULT_ASSOC_REFUSED,    // associating node refused our request
+    ZG_RESULT_REQ_IN_PROGRESS,  // only one mlme request at a time allowed
+    ZG_RESULT_NOT_JOINED,       // operation requires that device be joined
+                                // with target
+    ZG_RESULT_NOT_ASSOC,        // operation requires that device be
+                                // associated with target
+    ZG_RESULT_NOT_AUTH,         // operation requires that device be
+                                // authenticated with target
     ZG_RESULT_SUPPLICANT_FAILED,
     ZG_RESULT_UNSUPPORTED_FEATURE,
     ZG_RESULT_REQUEST_OUT_OF_SYNC	// Returned when a request is recognized
-    								// but invalid given the current state
-    								// of the MAC
+    								              // but invalid given the current state
+    								              // of the MAC
 };
 
 /*
@@ -234,8 +213,7 @@ enum {
 #define ZG_SECURITY_TYPE_WPA	2
 #define ZG_SECURITY_TYPE_WPA2	3
 
-typedef struct
-{
+typedef struct{
     u8 slot;	/* slot index */
     u8 keyLen;
     u8 defID;	/* the default wep key id */
@@ -246,8 +224,7 @@ typedef struct
 
 #define ZG_WEP_KEY_REQ_SIZE		(4 + ZG_MAX_SSID_LENGTH + ZG_MAX_ENCRYPTION_KEYS*ZG_MAX_ENCRYPTION_KEY_SIZE)
 
-typedef struct
-{
+typedef struct{
     u8 configBits;
     u8 phraseLen;	/* number of valid bytes in passphrase */
     u8 ssidLen;		/* number of valid bytes in ssid */
@@ -258,8 +235,7 @@ typedef struct
 
 #define ZG_PSK_CALC_REQ_SIZE	(4 + ZG_MAX_SSID_LENGTH + ZG_MAX_WPA_PASSPHRASE_LEN) /* 100 bytes */
 
-typedef struct
-{
+typedef struct{
     u8 result;		/* indicating success or other */
     u8 macState;	/* current State of the on-chip MAC */
     u8 keyReturned;	/* 1 if psk contains key data, 0 otherwise */
@@ -267,8 +243,7 @@ typedef struct
     u8 psk[ZG_MAX_PMK_LEN];	/* the psk bytes */
 } zg_psk_calc_cnf_t;
 
-typedef struct
-{
+typedef struct{
     u8 slot;
     u8 ssidLen;
     u8 ssid[ZG_MAX_SSID_LENGTH];
@@ -277,8 +252,7 @@ typedef struct
 
 #define ZG_PMK_KEY_REQ_SIZE		(2 + ZG_MAX_SSID_LENGTH + ZG_MAX_PMK_LEN)
 
-typedef struct
-{
+typedef struct{
     u16        rssi;                      /* the value of the G1000 RSSI when the data frame was received */
     u8         dstAddr[6];    /* MAC Address to which the data frame was directed. */
     u8         srcAddr[6];    /* MAC Address of the Station that sent the Data frame. */
@@ -287,9 +261,8 @@ typedef struct
     u16        dataLen;                   /* the length in bytes of the payload which immediately follows this data structure */
 } zg_rx_data_ind_t;
 
-typedef struct
-{
-	u8 secType;		/* security type : 0 - none; 1 - wep; 2 - wpa; 3 - wpa2; 0xff - best available */
+typedef struct{
+    u8 secType;		/* security type : 0 - none; 1 - wep; 2 - wpa; 3 - wpa2; 0xff - best available */
     u8 ssidLen;		/* num valid bytes in ssid */
     u8 ssid[ZG_MAX_SSID_LENGTH];	/* the ssid of the target */
     u16 sleepDuration;	/* power save sleep duration in units of 100 milliseconds */
@@ -299,23 +272,17 @@ typedef struct
 
 #define ZG_CONNECT_REQ_SIZE			(38)
 void zg_init();
-void zg_reset();
-void spi_transfer(volatile U8* buf, U16 len, U8 toggle_cs);
-void zg_chip_reset();
-void zg_interrupt2_reg();
-void zg_interrupt_reg(U8 mask, U8 state);
-void zg_isr();
-void zg_process_isr();
-void zg_send(U8* buf, U16 len);
-void zg_recv(U8* buf, U16* len);
-U16 zg_get_rx_status();
+uint16_t zg_get_rx_status();
 void zg_clear_rx_status();
-void zg_set_tx_status(U8 status);
-U8 zg_get_conn_state();
-void zg_set_buf(U8* buf, U16 buf_len);
-U8* zg_get_mac();
-void zg_set_ssid(U8* ssid, U8 ssid_len);
-void zg_set_sec(U8 sec_type, U8* sec_key, U8 sec_key_len);
-void zg_drv_process();
+
+void wifi_set_ssid(char* new_ssid);
+void wifi_set_passphrase(char* new_passphrase);
+void wifi_set_security_type(u8 type);
+void wifi_connect();
+void wifi_prepare_payload(char* buf, uint16_t len);
+void wifi_send();
+void wifi_set_mode(uint8_t mode);
+void wifi_getMAC(uint8_t* d);
+uint8_t wifi_is_connected();
 
 #endif /* G2100_H_ */
