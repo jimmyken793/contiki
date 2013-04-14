@@ -109,7 +109,8 @@ uint8_t wireless_mode;
 unsigned char wep_keys[];
 
 void drv_spi_transfer(volatile uint8_t* buf, uint16_t len, uint8_t toggle_cs);
-void drv_interrupt_register(uint8_t mask, uint8_t state);
+void drv_register_interrupt(uint8_t mask, uint8_t state);
+void drv_register_interrupt2(uint16_t mask, uint8_t state);
 void zg_isr();
 void zg_write_wep_key(uint8_t* cmd_buf);
 static void zg_calc_psk_key(uint8_t* cmd_buf);
@@ -317,8 +318,8 @@ int MRF24WB0MA_init(void){
   drv_spi_transfer(hdr, 5, 1);
   // end register interrupt2
 
-  drv_interrupt_register(0xff, 0);
-  drv_interrupt_register(0x80|0x40, 1);
+  drv_register_interrupt(WF_HOST_INT_MASK_ALL_INT, WF_INT_DISABLE);
+  drv_register_interrupt(WF_HOST_INT_MASK_FIFO_1_THRESHOLD | WF_HOST_INT_MASK_FIFO_0_THRESHOLD | WF_HOST_INT_MASK_RAW_0_INT_0 | WF_HOST_INT_MASK_RAW_1_INT_0 , WF_INT_ENABLE);
   attachInterrupt(2, zg_isr, 0);
   drv_request_mac();
   printf_P(PSTR("MRF24WB0MA_init done!\n"));

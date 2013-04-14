@@ -246,7 +246,7 @@ enum {
 /* MRF24W registers accessed via the WF_INDEX_ADDR_REG and WF_INDEX_DATA_REG registers */
 /*----------------------------------------------------------------------------------------*/
 #define WF_HW_STATUS_REG            ((uint16_t)(0x2a)) /* 16-bit read only register providing hardware status bits */
-#define WF_CONFIG_CTRL0_REG         ((uint16_t)(0x002e)) /* 16-bit register used to initiate Hard reset              */
+#define WF_CONFIG_CTRL0_REG         ((uint16_t)(0x2e)) /* 16-bit register used to initiate Hard reset              */
 #define WF_LOW_POWER_STATUS_REG     ((uint16_t)(0x3e)) /* 16-bit register read to determine when low power is done */
 
 /* This bit mask is used in the HW_STATUS_REG to determine */

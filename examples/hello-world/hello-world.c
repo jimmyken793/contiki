@@ -49,14 +49,17 @@ PROCESS_THREAD(hello_world_process, ev, data)
 {
 	PROCESS_BEGIN();
 
-	wifi_set_ssid("Mobile Phone Lab");
-	wifi_set_passphrase("androidiphone");
-	wifi_set_mode(WIRELESS_MODE_INFRA);
-	wifi_set_security_type(ZG_SECURITY_TYPE_WPA2);
-	// wifi_set_ssid("JimmyTest");
+	// wifi_set_ssid("Mobile Phone Lab");
+	// wifi_set_passphrase("androidiphone");
+	// wifi_set_mode(WIRELESS_MODE_INFRA);
+	// wifi_set_security_type(ZG_SECURITY_TYPE_WPA2);
+	// wifi_set_ssid("Jimmy");
 	// wifi_set_passphrase("jimmy12345orz");
-	// wifi_set_mode(WIRELESS_MODE_ADHOC);
-	// wifi_set_security_type(ZG_SECURITY_TYPE_NONE);
+	// wifi_set_mode(WIRELESS_MODE_INFRA);
+	// wifi_set_security_type(ZG_SECURITY_TYPE_WPA2);
+	wifi_set_ssid("JimmyTest");
+	wifi_set_mode(WIRELESS_MODE_ADHOC);
+	wifi_set_security_type(ZG_SECURITY_TYPE_NONE);
 	wifi_connect();
 	printf("Hello, world\n");
 	//while(1);
