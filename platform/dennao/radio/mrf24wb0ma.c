@@ -301,23 +301,9 @@ int MRF24WB0MA_init(void){
   } while((hdr[1] == 0) && (hdr[2] == 0));
   //end reset chip
 
-  // register interrupt2
-  // read the interrupt2 mask register
-  hdr[0] = 0x40 | ZG_INTR2_MASK_REG;
-  hdr[1] = 0x00;
-  hdr[2] = 0x00;
-  drv_spi_transfer(hdr, 3, 1);
 
-  // modify the interrupt mask value and re-write the value to the interrupt
-  // mask register clearing the interrupt register first
-  hdr[0] = ZG_INTR2_REG;
-  hdr[1] = 0xff;
-  hdr[2] = 0xff;
-  hdr[3] = 0;
-  hdr[4] = 0;
-  drv_spi_transfer(hdr, 5, 1);
-  // end register interrupt2
 
+  drv_register_interrupt2(WF_HOST_2_INT_MASK_ALL_INT, WF_INT_DISABLE);
   drv_register_interrupt(WF_HOST_INT_MASK_ALL_INT, WF_INT_DISABLE);
   drv_register_interrupt(WF_HOST_INT_MASK_FIFO_1_THRESHOLD | WF_HOST_INT_MASK_FIFO_0_THRESHOLD | WF_HOST_INT_MASK_RAW_0_INT_0 | WF_HOST_INT_MASK_RAW_1_INT_0 , WF_INT_ENABLE);
   attachInterrupt(2, zg_isr, 0);
