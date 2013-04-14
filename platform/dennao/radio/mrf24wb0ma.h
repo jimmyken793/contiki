@@ -210,7 +210,67 @@ enum {
                                                   // of the MAC
 };
 
+#define WF_READ_REGISTER_MASK           ((uint8_t)(0x40))
+#define WF_WRITE_REGISTER_MASK          ((uint8_t)(0x00))
 
+/*--------------------------------*/
+/* MRF24W 8-bit Host Registers */
+/*--------------------------------*/
+#define WF_HOST_INTR_REG            ((uint8_t)(0x01))  /* 8-bit register containing 1st level interrupt bits. */
+#define WF_HOST_MASK_REG            ((uint8_t)(0x02))  /* 8-bit register containing 1st level interrupt mask. */
+
+/*---------------------------------*/
+/* MRF24W 16-bit Host Registers */
+/*---------------------------------*/
+#define WF_HOST_RAW0_CTRL1_REG      ((uint16_t)(0x26))
+#define WF_HOST_RAW0_STATUS_REG     ((uint16_t)(0x28))
+#define WF_HOST_RAW1_CTRL1_REG      ((uint16_t)(0x2a))
+#define WF_HOST_INTR2_REG           ((uint16_t)(0x2d)) /* 16-bit register containing 2nd level interrupt bits */
+#define WF_HOST_INTR2_MASK_REG      ((uint16_t)(0x2e))
+#define WF_HOST_WFIFO_BCNT0_REG     ((uint16_t)(0x2f)) /* 16-bit register containing available write size for fifo 0 (data)   */
+                                                     /* (LS 12 bits contain the length)                                     */
+                                                       
+#define WF_HOST_WFIFO_BCNT1_REG     ((uint16_t)(0x31)) /* 16-bit register containing available write size for fifo 1 (mgmt)   */
+                                                     /* (LS 12 bits contain the length)                                     */
+
+#define WF_HOST_RFIFO_BCNT0_REG     ((uint16_t)(0x33)) /* 16-bit register containing number of bytes in read fifo 0 (data rx) */
+                                                     /* (LS 12 bits contain the length)                                     */
+#define WF_HOST_RESET_REG           ((uint16_t)(0x3c))
+#define WF_HOST_RESET_MASK          ((uint16_t)(0x0001))
+                                                       
+#define WF_PSPOLL_H_REG             ((uint16_t)(0x3d)) /* 16-bit register used to control low power mode                      */
+#define WF_INDEX_ADDR_REG           ((uint16_t)(0x3e)) /* 16-bit register to move the data window                             */
+#define WF_INDEX_DATA_REG           ((uint16_t)(0x3f)) /* 16-bit register to read or write address-indexed register           */
+
+/*----------------------------------------------------------------------------------------*/
+/* MRF24W registers accessed via the WF_INDEX_ADDR_REG and WF_INDEX_DATA_REG registers */
+/*----------------------------------------------------------------------------------------*/
+#define WF_HW_STATUS_REG            ((uint16_t)(0x2a)) /* 16-bit read only register providing hardware status bits */
+#define WF_CONFIG_CTRL0_REG         ((uint16_t)(0x002e)) /* 16-bit register used to initiate Hard reset              */
+#define WF_LOW_POWER_STATUS_REG     ((uint16_t)(0x3e)) /* 16-bit register read to determine when low power is done */
+
+/* This bit mask is used in the HW_STATUS_REG to determine */
+/* when the MRF24W has completed its hardware reset.       */
+/*  0 : MRF24W is in reset                                 */
+/*  1 : MRF24W is not in reset                             */
+#define WF_HW_STATUS_NOT_IN_RESET_MASK ((uint16_t)(0x1000)) 
+
+/* Definitions represent individual interrupt bits for the 8-bit host interrupt registers */
+/*  WF_HOST_INTR_REG and WF_HOST_MASK_REG                                                 */
+#define WF_HOST_INT_MASK_INT2               ((uint8_t)(0x01))
+#define WF_HOST_INT_MASK_FIFO_1_THRESHOLD   ((uint8_t)(0x80))
+#define WF_HOST_INT_MASK_FIFO_0_THRESHOLD   ((uint8_t)(0x40))
+#define WF_HOST_INT_MASK_RAW_1_INT_0        ((uint8_t)(0x04))
+#define WF_HOST_INT_MASK_RAW_0_INT_0        ((uint8_t)(0x02))
+#define WF_HOST_INT_MASK_ALL_INT            ((uint8_t)(0xff))
+
+/* Bit mask for all interrupts in the level 2 16-bit interrupt register */
+#define WF_HOST_2_INT_MASK_ALL_INT          ((uint16_t)(0xffff))
+
+/* these definitions are used in calls to enable and
+ * disable interrupt bits. */
+#define WF_INT_DISABLE ((uint8_t)0)
+#define WF_INT_ENABLE  ((uint8_t)1)
 
 /*
  * G2100 command registers

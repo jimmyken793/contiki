@@ -38,7 +38,7 @@
  */
 
 #include "contiki.h"
-#include "radio/g2100.h"
+#include "radio/mrf24wb0ma.h"
 
 #include <stdio.h> /* For printf() */
 /*---------------------------------------------------------------------------*/

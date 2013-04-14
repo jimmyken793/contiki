@@ -93,6 +93,7 @@ static uint8_t intr_valid;
 static uint8_t tx_ready;
 static uint8_t rx_ready;
 static uint8_t tx_confirm_pending;
+
 static uint8_t drv_buf[RADIO_BUFFER_LEN];
 static uint16_t drv_buf_len;
 
@@ -121,6 +122,10 @@ void drv_enable_connection_manager();
 void drv_setup_security();
 void drv_request_mac();
 void drv_process();
+void wifi_write_16bit_register(uint8_t reg, uint16_t val);
+uint16_t wifi_read_16bit_register(uint8_t reg);
+void wifi_write_8bit_register(uint8_t reg, uint8_t val);
+uint8_t wifi_read_8bit_register(uint8_t reg);
 
 static int MRF24WB0MA_on(void);
 static int MRF24WB0MA_off(void);
@@ -148,8 +153,94 @@ const struct radio_driver mrf24wb0ma_driver =
     MRF24WB0MA_on,
     MRF24WB0MA_off
   };
+void drv_spi_transfer(volatile uint8_t* buf, uint16_t len, uint8_t toggle_cs){
+  WIFI_SS_OFF();
+  static uint16_t i;
+  for (i = 0; i < len; i++) {
+    SPI_WRITE(buf[i]);
+    SPI_READ(buf[i]);
+  }
+  if (toggle_cs){
+    WIFI_SS_ON();
+  }
+  return;
+}
 
-/*---------------------------------------------------------------------------*/
+void drv_register_interrupt(uint8_t mask, uint8_t state){
+  // read the interrupt register
+  // static uint8_t val;
+  // val = wifi_read_8bit_register(WF_HOST_MASK_REG);
+  // if (state == WF_INT_DISABLE){
+  //   val = (val & ~mask);
+  // }else{
+  //   val = (val & ~mask) | mask;
+  // }
+  //  write out new interrupt mask value 
+  // wifi_write_8bit_register(WF_HOST_MASK_REG, val);
+
+  // /* ensure that pending interrupts from those updated interrupts are cleared */
+  // wifi_write_8bit_register(WF_HOST_INTR_REG, mask);
+  // read the interrupt register
+  hdr[0] = 0x40 | ZG_INTR_MASK_REG;
+  hdr[1] = 0x00;
+  drv_spi_transfer(hdr, 2, 1);
+  // now regBuf[0] contains the current setting for the
+  // interrupt mask register
+  // this is to clear any currently set interrupts of interest
+  hdr[0] = ZG_INTR_REG;
+  hdr[2] = (hdr[1] & ~mask) | ( (state == 0)? 0 : mask );
+  hdr[1] = mask;
+  drv_spi_transfer(hdr, 3, 1);
+}
+
+void drv_register_interrupt2(uint16_t mask, uint8_t state){
+  static uint16_t val;
+  val = wifi_read_16bit_register(WF_HOST_INTR2_MASK_REG);
+  if (state == WF_INT_DISABLE){
+    val &= ~mask;
+  }else{
+    val |= mask;
+  }
+
+  /* write out new interrupt mask value */
+  wifi_write_16bit_register(WF_HOST_INTR2_MASK_REG, val);
+
+  /* ensure that pending interrupts from those updated interrupts are cleared */
+  wifi_write_16bit_register(WF_HOST_INTR2_REG, mask);
+}
+
+void zg_isr(){
+  printf("interrupt!\n");
+  WIFI_ISR_DISABLE();
+  intr_occured = 1;
+  process_poll(&mrf24wb0ma_process);
+}
+
+void wifi_write_16bit_register(uint8_t reg, uint16_t val){
+  drv_buf[0] = reg | WF_WRITE_REGISTER_MASK;
+  drv_buf[1] = (uint8_t) (val >> 8);
+  drv_buf[2] = (uint8_t) (val & 0x00FF);
+  drv_spi_transfer(drv_buf, 3, 1);
+}
+
+uint16_t wifi_read_16bit_register(uint8_t reg){
+  drv_buf[0] = reg | WF_READ_REGISTER_MASK;
+  drv_spi_transfer(drv_buf, 3, 1);
+  return (((uint16_t)drv_buf[1]) << 8) | ((uint16_t)(drv_buf[2]));
+}
+
+void wifi_write_8bit_register(uint8_t reg, uint8_t val){
+  drv_buf[0] = reg | WF_WRITE_REGISTER_MASK;
+  drv_buf[1] = val;
+  drv_spi_transfer(drv_buf, 2, 1);
+}
+
+uint8_t wifi_read_8bit_register(uint8_t reg){
+  drv_buf[0] = reg | WF_READ_REGISTER_MASK;
+  drv_spi_transfer(drv_buf, 2, 1);
+  return drv_buf[1];
+}
+
 int MRF24WB0MA_init(void){
 
   printf_P(PSTR("MRF24WB0MA_init\n"));
@@ -369,41 +460,6 @@ void wifi_set_mode(uint8_t mode){
 void wifi_getMAC(uint8_t* d){
   memcpy(d,mac,sizeof(mac));
 }
-
-void drv_spi_transfer(volatile uint8_t* buf, uint16_t len, uint8_t toggle_cs){
-  WIFI_SS_OFF();
-  static uint16_t i;
-  for (i = 0; i < len; i++) {
-    SPI_WRITE(buf[i]);
-    SPI_READ(buf[i]);
-  }
-  if (toggle_cs){
-    WIFI_SS_ON();
-  }
-  return;
-}
-
-void drv_interrupt_register(uint8_t mask, uint8_t state){
-  // read the interrupt register
-  hdr[0] = 0x40 | ZG_INTR_MASK_REG;
-  hdr[1] = 0x00;
-  drv_spi_transfer(hdr, 2, 1);
-  // now regBuf[0] contains the current setting for the
-  // interrupt mask register
-  // this is to clear any currently set interrupts of interest
-  hdr[0] = ZG_INTR_REG;
-  hdr[2] = (hdr[1] & ~mask) | ( (state == 0)? 0 : mask );
-  hdr[1] = mask;
-  drv_spi_transfer(hdr, 3, 1);
-}
-
-void zg_isr(){
-  //printf("interrupt!\n");
-  WIFI_ISR_DISABLE();
-  intr_occured = 1;
-  process_poll(&mrf24wb0ma_process);
-}
-
 
 // TODO: unknown usage
 uint16_t zg_get_rx_status(){
