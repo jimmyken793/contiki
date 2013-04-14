@@ -42,7 +42,7 @@
 #include "net/queuebuf.h"
 #include "net/netstack.h"
 #include "net/uip_arp.h"
-#include "radio/g2100.h"
+#include "radio/mrf24wb0ma.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
