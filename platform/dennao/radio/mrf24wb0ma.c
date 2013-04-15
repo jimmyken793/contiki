@@ -288,10 +288,8 @@ static int MRF24WB0MA_prepare(const void *payload, unsigned short payload_len)
 /*---------------------------------------------------------------------------*/
 static int MRF24WB0MA_send(const void *payload, unsigned short payload_len)
 {
-	int ret = 0;
-  MRF24WB0MA_prepare(payload, payload_len);
-  MRF24WB0MA_transmit(payload_len);
-	return ret;
+	MRF24WB0MA_prepare(payload, payload_len);
+  return MRF24WB0MA_transmit(payload_len);
 }
 /*---------------------------------------------------------------------------*/
 static int MRF24WB0MA_off(void)
@@ -589,11 +587,11 @@ void drv_process(){
     hdr[4] = 0x00;
     drv_spi_transfer(hdr, 5, 0);
 
-    drv_buf[6] = 0xaa;
-    drv_buf[7] = 0xaa;
-    drv_buf[8] = 0x03;
-    drv_buf[9] = drv_buf[10] = drv_buf[11] = 0x00;
-    drv_spi_transfer(drv_buf, drv_buf_len, 1);
+    tx_buf[6] = 0xaa;
+    tx_buf[7] = 0xaa;
+    tx_buf[8] = 0x03;
+    tx_buf[9] = tx_buf[10] = tx_buf[11] = 0x00;
+    drv_spi_transfer(tx_buf, tx_buf_len, 1);
 
     hdr[0] = ZG_CMD_WT_FIFO_DONE;
     drv_spi_transfer(hdr, 1, 1);
