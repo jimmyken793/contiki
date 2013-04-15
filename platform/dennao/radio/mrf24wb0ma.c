@@ -95,7 +95,9 @@ static uint8_t rx_ready;
 static uint8_t tx_confirm_pending;
 
 static uint8_t drv_buf[RADIO_BUFFER_LEN];
+static uint8_t tx_buf[RADIO_BUFFER_LEN];
 static uint16_t drv_buf_len;
+static uint16_t tx_buf_len;
 
 static uint8_t wpa_psk_key[32];
 
@@ -246,6 +248,7 @@ int MRF24WB0MA_init(void){
   rx_ready = 0;
   tx_confirm_pending = 0;
   drv_buf_len = RADIO_BUFFER_LEN;
+  tx_buf_len = RADIO_BUFFER_LEN;
 
   wifi_write_16bit_register(WF_PSPOLL_H_REG, 0x0000);
   wifi_write_16bit_register(WF_HOST_RESET_REG, wifi_read_16bit_register(WF_HOST_RESET_REG) | WF_HOST_RESET_MASK);
@@ -289,8 +292,8 @@ static int MRF24WB0MA_prepare(const void *payload, unsigned short payload_len)
     printf("\n");
   }
   int ret = 0;
-  memcpy(drv_buf, payload, payload_len);
-  drv_buf_len = payload_len;
+  memcpy(tx_buf, payload, payload_len);
+  tx_buf_len = payload_len;
   return ret;
 }
 /*---------------------------------------------------------------------------*/
@@ -323,14 +326,22 @@ static int MRF24WB0MA_on(void)
  * As a result, PRINTF cannot be used in here.
  */
 /*---------------------------------------------------------------------------*/
-static int MRF24WB0MA_read(void *buf, unsigned short bufsize)
-{
-  printf_P(PSTR("TODO:MRF24WB0MA_read\n"));
-  return 0;
+static int MRF24WB0MA_read(void *buf, unsigned short bufsize){
+  // TODO: mind buf size when copying.
+  zg_rx_data_ind_t* ptr = (zg_rx_data_ind_t*)&(drv_buf[3]);
+  drv_buf_len = ZGSTOHS( ptr->dataLen );
+
+  memcpy(&buf[0], &drv_buf[5], 6);
+  memcpy(&buf[6], &drv_buf[11], 6);
+  memcpy(&buf[12], &drv_buf[29], drv_buf_len);
+
+  drv_buf_len += 12;
+  rx_ready = 1;
+
+  return drv_buf_len;
 }
 /*---------------------------------------------------------------------------*/
-static int MRF24WB0MA_cca(void)
-{
+static int MRF24WB0MA_cca(void){
   printf_P(PSTR("TODO:MRF24WB0MA_cca\n"));
 	 return 0;
 }
@@ -519,15 +530,7 @@ void drv_install_psk(){
 }
 
 void drv_process_rx(){
-  zg_rx_data_ind_t* ptr = (zg_rx_data_ind_t*)&(drv_buf[3]);
-  drv_buf_len = ZGSTOHS( ptr->dataLen );
-
-  memcpy(&drv_buf[0], &drv_buf[5], 6);
-  memcpy(&drv_buf[6], &drv_buf[11], 6);
-  memcpy(&drv_buf[12], &drv_buf[29], drv_buf_len);
-
-  drv_buf_len += 12;
-  rx_ready = 1;
+  drv_buf_len = MRF24WB0MA_read(drv_buf, drv_buf_len);
 
   packetbuf_copyfrom(drv_buf, drv_buf_len);
   packetbuf_set_datalen(drv_buf_len);
