@@ -60,7 +60,7 @@ create(void)
 
   if(packetbuf_hdralloc(sizeof(struct uip_eth_hdr))) {
     hdr = packetbuf_hdrptr();
-    memcpy(&(hdr->src), &uip_ethaddr, 6);
+    memcpy(&(hdr->src), &uip_lladdr, 6);
     memcpy(&(hdr->dest), &broadcast_ethaddr, 6);
     hdr->type = 0x08;
     return sizeof(struct uip_eth_hdr);

@@ -223,6 +223,8 @@
 #define SICSLOWPAN_CONF_CONVENTIONAL_MAC	1
 #define SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS       2
 #else /* WITH_UIP6 */
+
+#define UIP_CONF_IPV6            0
 #define UIP_CONF_IP_FORWARD      0
 #define UIP_CONF_BUFFER_SIZE     1000
 #endif /* WITH_UIP6 */

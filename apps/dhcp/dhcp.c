@@ -97,11 +97,12 @@ makestrings(void)
 PROCESS_THREAD(dhcp_process, ev, data)
 {
   PROCESS_BEGIN();
-  printf("%02x:%02x:%02x:%02x:%02x:%02x\n",uip_ethaddr.addr[0],uip_ethaddr.addr[1],uip_ethaddr.addr[2],uip_ethaddr.addr[3],uip_ethaddr.addr[4],uip_ethaddr.addr[5]);
+  printf("%02x:%02x:%02x:%02x:%02x:%02x\n",uip_lladdr.addr[0],uip_lladdr.addr[1],uip_lladdr.addr[2],uip_lladdr.addr[3],uip_lladdr.addr[4],uip_lladdr.addr[5]);
   
-  dhcpc_init(uip_ethaddr.addr, sizeof(uip_ethaddr.addr));
+  dhcpc_init(uip_lladdr.addr, sizeof(uip_lladdr.addr));
   dhcpc_request();
   printf("dhcpc started!\n");
+
   while(1) {
     PROCESS_WAIT_EVENT();
   printf("dhcpc event! %d\n",ev);
