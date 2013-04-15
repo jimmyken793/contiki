@@ -75,7 +75,7 @@ static void
 input(void)
 {
   if(packetbuf_datalen() > 0 && packetbuf_datalen() <= UIP_BUFSIZE - UIP_LLH_LEN) {
-    memcpy(&uip_buf[UIP_LLH_LEN], packetbuf_dataptr(), packetbuf_datalen());
+    memcpy(uip_buf, packetbuf_dataptr(), packetbuf_datalen());
     uip_len = packetbuf_datalen();
     if(uip_len > 0) {
       if(BUF->type == uip_htons(UIP_ETHTYPE_IP)) {

@@ -305,18 +305,8 @@ static int MRF24WB0MA_on(void)
 }
 /*---------------------------------------------------------------------------*/
 static int MRF24WB0MA_read(void *buf, unsigned short bufsize){
-  // TODO: mind buf size when copying.
-  zg_rx_data_ind_t* ptr = (zg_rx_data_ind_t*)&(drv_buf[3]);
-  drv_buf_len = ZGSTOHS( ptr->dataLen );
-
-  memcpy(&buf[0], &drv_buf[5], 6);
-  memcpy(&buf[6], &drv_buf[11], 6);
-  memcpy(&buf[12], &drv_buf[29], drv_buf_len);
-
-  drv_buf_len += 12;
-  rx_ready = 1;
-
-  return drv_buf_len;
+  printf_P(PSTR("TODO:MRF24WB0MA_read\n"));
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 static int MRF24WB0MA_cca(void){
@@ -508,7 +498,16 @@ void drv_install_psk(){
 }
 
 void drv_process_rx(){
-  drv_buf_len = MRF24WB0MA_read(drv_buf, drv_buf_len);
+    // TODO: mind buf size when copying.
+  zg_rx_data_ind_t* ptr = (zg_rx_data_ind_t*)&(drv_buf[3]);
+  drv_buf_len = ZGSTOHS( ptr->dataLen );
+
+  memcpy(&drv_buf[0], &drv_buf[5], 6);
+  memcpy(&drv_buf[6], &drv_buf[11], 6);
+  memcpy(&drv_buf[12], &drv_buf[29], drv_buf_len);
+
+  drv_buf_len += 12;
+  rx_ready = 1;
 
   packetbuf_copyfrom(drv_buf, drv_buf_len);
   packetbuf_set_datalen(drv_buf_len);
