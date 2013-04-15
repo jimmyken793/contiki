@@ -41,6 +41,6 @@
 
 #include "net/mac/framer.h"
 
-extern const struct framer framer_ethernet;
+extern const struct framer framer_nullmac;
 
 #endif /* __FRAMER_ETHERNET_H__ */
