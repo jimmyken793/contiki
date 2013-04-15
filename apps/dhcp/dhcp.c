@@ -105,9 +105,7 @@ PROCESS_THREAD(dhcp_process, ev, data)
 
   while(1) {
     PROCESS_WAIT_EVENT();
-  printf("dhcpc event! %d\n",ev);
     if(ev == tcpip_event) {
-  printf("dhcpc tcpip event!\n");
       dhcpc_appcall(ev, data);
     }
   }

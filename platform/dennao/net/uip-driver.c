@@ -51,19 +51,9 @@ uint8_t
 uip_driver_send(void)
 {
   uip_arp_out();
-  printf("uip send packet %d!!\n", uip_len);
   packetbuf_copyfrom(&uip_buf, uip_len);
   packetbuf_set_datalen(uip_len);
 
-    {
-      int i;
-      for(i=0;i<uip_len;i++){
-       printf("%02x ", ((uint8_t*)uip_buf)[i]);
-       if(i%20==19)
-        printf("\n");
-      }
-      printf("\n");
-    }
   /* XXX we should provide a callback function that is called when the
      packet is sent. For now, we just supply a NULL pointer. */
   NETSTACK_MAC.send(NULL, NULL);
@@ -84,7 +74,6 @@ init(void)
 static void
 input(void)
 {
-  printf("uip input!!\n");
   if(packetbuf_datalen() > 0 && packetbuf_datalen() <= UIP_BUFSIZE - UIP_LLH_LEN) {
     memcpy(&uip_buf[UIP_LLH_LEN], packetbuf_dataptr(), packetbuf_datalen());
     uip_len = packetbuf_datalen();

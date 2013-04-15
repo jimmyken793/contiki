@@ -280,17 +280,6 @@ static int MRF24WB0MA_transmit(unsigned short payload_len){
 /*---------------------------------------------------------------------------*/
 static int MRF24WB0MA_prepare(const void *payload, unsigned short payload_len)
 {
-  printf("preparing data %d\n", payload_len);
-
-  {
-    int i;
-    for(i=0;i<payload_len;i++){
-     printf("%02x ", ((uint8_t*)payload)[i]);
-     if(i%20==19)
-      printf("\n");
-    }
-    printf("\n");
-  }
   int ret = 0;
   memcpy(tx_buf, payload, payload_len);
   tx_buf_len = payload_len;
@@ -316,15 +305,6 @@ static int MRF24WB0MA_on(void)
   printf_P(PSTR("TODO:wifi turned on\n"));
   return 1;
 }
-
-/* Read packet that was uploaded from Radio in ISR, else return zero.
- * The two-byte checksum is appended but the returned length does not include it.
- * Frames are buffered in the interrupt routine so this routine
- * does not access the hardware or change its status.
- * However, this routine must be called with interrupts disabled to avoid ISR
- * writing to the same buffer we are reading.
- * As a result, PRINTF cannot be used in here.
- */
 /*---------------------------------------------------------------------------*/
 static int MRF24WB0MA_read(void *buf, unsigned short bufsize){
   // TODO: mind buf size when copying.
@@ -662,6 +642,7 @@ void drv_process(){
   if (intr_valid) {
     switch (drv_buf[1]) {
     case ZG_MAC_TYPE_TXDATA_CONFIRM:
+      DEBUG_PRINT("Tx Confirm!\n");
       tx_confirm_pending = 0;
       break;
     case ZG_MAC_TYPE_MGMT_CONFIRM:
