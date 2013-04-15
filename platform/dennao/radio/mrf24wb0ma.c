@@ -169,29 +169,18 @@ void drv_spi_transfer(volatile uint8_t* buf, uint16_t len, uint8_t toggle_cs){
 
 void drv_register_interrupt(uint8_t mask, uint8_t state){
   // read the interrupt register
-  // static uint8_t val;
-  // val = wifi_read_8bit_register(WF_HOST_MASK_REG);
-  // if (state == WF_INT_DISABLE){
-  //   val = (val & ~mask);
-  // }else{
-  //   val = (val & ~mask) | mask;
-  // }
-  //  write out new interrupt mask value 
-  // wifi_write_8bit_register(WF_HOST_MASK_REG, val);
+  static uint8_t val;
+  val = wifi_read_8bit_register(WF_HOST_MASK_REG);
+  if (state == WF_INT_DISABLE){
+    val = (val & ~mask);
+  }else{
+    val = (val & ~mask) | mask;
+  }
+  // write out new interrupt mask value 
+  wifi_write_8bit_register(WF_HOST_MASK_REG, val);
 
-  // /* ensure that pending interrupts from those updated interrupts are cleared */
-  // wifi_write_8bit_register(WF_HOST_INTR_REG, mask);
-  // read the interrupt register
-  hdr[0] = 0x40 | ZG_INTR_MASK_REG;
-  hdr[1] = 0x00;
-  drv_spi_transfer(hdr, 2, 1);
-  // now regBuf[0] contains the current setting for the
-  // interrupt mask register
-  // this is to clear any currently set interrupts of interest
-  hdr[0] = ZG_INTR_REG;
-  hdr[2] = (hdr[1] & ~mask) | ( (state == 0)? 0 : mask );
-  hdr[1] = mask;
-  drv_spi_transfer(hdr, 3, 1);
+  // ensure that pending interrupts from those updated interrupts are cleared 
+  wifi_write_8bit_register(WF_HOST_INTR_REG, mask);
 }
 
 void drv_register_interrupt2(uint16_t mask, uint8_t state){
@@ -211,7 +200,6 @@ void drv_register_interrupt2(uint16_t mask, uint8_t state){
 }
 
 void zg_isr(){
-  printf("interrupt!\n");
   WIFI_ISR_DISABLE();
   intr_occured = 1;
   process_poll(&mrf24wb0ma_process);
@@ -259,49 +247,16 @@ int MRF24WB0MA_init(void){
   tx_confirm_pending = 0;
   drv_buf_len = RADIO_BUFFER_LEN;
 
-  // reset chip
-  // write reset register addr
-  hdr[0] = ZG_INDEX_ADDR_REG;
-  hdr[1] = 0x00;
-  hdr[2] = ZG_RESET_REG;
-  drv_spi_transfer(hdr, 3, 1);
+  wifi_write_16bit_register(WF_PSPOLL_H_REG, 0x0000);
+  wifi_write_16bit_register(WF_HOST_RESET_REG, wifi_read_16bit_register(WF_HOST_RESET_REG) | WF_HOST_RESET_MASK);
+  wifi_write_16bit_register(WF_HOST_RESET_REG, wifi_read_16bit_register(WF_HOST_RESET_REG) & ~WF_HOST_RESET_MASK);
 
-  hdr[0] = ZG_INDEX_DATA_REG;
-  hdr[1] = 0x80;
-  hdr[2] = 0xff;
-  drv_spi_transfer(hdr, 3, 1);
+  wifi_write_16bit_register(WF_INDEX_ADDR_REG, WF_HW_STATUS_REG);
 
-  // write reset register addr
-  hdr[0] = ZG_INDEX_ADDR_REG;
-  hdr[1] = 0x00;
-  hdr[2] = ZG_RESET_REG;
-  drv_spi_transfer(hdr, 3, 1);
+  // TODO: check the return value is not 0xFFFF
+  while((wifi_read_16bit_register(WF_INDEX_DATA_REG) & WF_HW_STATUS_NOT_IN_RESET_MASK) == 0);
 
-  hdr[0] = ZG_INDEX_DATA_REG;
-  hdr[1] = 0x0f;
-  hdr[2] = 0xff;
-  drv_spi_transfer(hdr, 3, 1);
-
-  // write reset register data
-  hdr[0] = ZG_INDEX_ADDR_REG;
-  hdr[1] = 0x00;
-  hdr[2] = ZG_RESET_STATUS_REG;
-  drv_spi_transfer(hdr, 3, 1);
-  do {
-    hdr[0] = 0x40 | ZG_INDEX_DATA_REG;
-    hdr[1] = 0x00;
-    hdr[2] = 0x00;
-    drv_spi_transfer(hdr, 3, 1);
-  } while((hdr[1] & ZG_RESET_MASK) == 0);
-  do {
-    hdr[0] = 0x40 | ZG_BYTE_COUNT_REG;
-    hdr[1] = 0x00;
-    hdr[2] = 0x00;
-    drv_spi_transfer(hdr, 3, 1);
-  } while((hdr[1] == 0) && (hdr[2] == 0));
-  //end reset chip
-
-
+  while((wifi_read_16bit_register(WF_HOST_WFIFO_BCNT0_REG) & 0x0fff) == 0);
 
   drv_register_interrupt2(WF_HOST_2_INT_MASK_ALL_INT, WF_INT_DISABLE);
   drv_register_interrupt(WF_HOST_INT_MASK_ALL_INT, WF_INT_DISABLE);
