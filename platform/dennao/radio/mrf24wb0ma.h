@@ -54,7 +54,6 @@
 /*============================ INCLUDE =======================================*/
 #include <stdint.h>
 #include <stdbool.h>
-#include "atmega128rfa1_registermap.h"
 #include "dev/radio.h"
 #include "dennao_interrupt.h"
 #include "sys/process.h"
