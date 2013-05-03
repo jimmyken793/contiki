@@ -1,11 +1,22 @@
-CONTIKI_TARGET_DIRS = . apps net loader radio
+CONTIKI_TARGET_DIRS = . apps net loader radio dev/sdcard
 CONTIKI_CORE=contiki-rcb-main
 CONTIKI_TARGET_MAIN = ${CONTIKI_CORE}.o
 
+CFLAGS+= -Os
+
 NETWORK_DRIVER = uip-driver.c
 
-CONTIKI_TARGET_SOURCEFILES +=	rs232.c cfs-eeprom.c eeprom.c random.c WInterrupts.c \
-				mmem.c contiki-arduino-main.c slip.c mrf24wb0ma.c $(NETWORK_DRIVER)
+CONTIKI_TARGET_SOURCEFILES += eeprom.c random.c WInterrupts.c \
+				mmem.c contiki-arduino-main.c slip.c mrf24wb0ma.c \
+				$(NETWORK_DRIVER) cfs-sdcard.c sd-spi.c
+				#cfs-eeprom.c 
+
+
+EFSL_DIR=/Users/jimmy/Downloads/efsl-0.2.8
+EFSL_SRC= efs.c fat.c partition.c ioman.c disc.c fs.c file.c plibc.c extract.c dir.c time.c ls.c ui.c
+CONTIKIDIRS += $(EFSL_DIR)/src $(EFSL_DIR)/src/interfaces
+CONTIKI_TARGET_SOURCEFILES += $(EFSL_SRC) 
+CFLAGS+= -I $(EFSL_DIR)/inc -I $(CONTIKI)/platform/$(TARGET)/dev/sdcard
 
 CONTIKIAVR=$(CONTIKI)/cpu/avr
 CONTIKIBOARD=.

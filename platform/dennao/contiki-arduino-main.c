@@ -104,6 +104,7 @@ int main(void)
   PORTB &= ~(1<<5);
   serial_line_init();
   printf_P(PSTR("\r\n********BOOTING CONTIKI*********\r\n"));
+	efs_sdcard_init();
 
   autostart_start(autostart_processes);
   printf_P(PSTR("System online.\r\n"));

@@ -1,0 +1,30 @@
+#ifndef __EFSL_CONFIG_H__
+#define __EFSL_CONFIG_H__
+
+
+#define HW_ENDPOINT_ATMEGA128_SD
+
+#define VARSIZE_ATMEGA
+
+#define BYTE_ALIGNMENT
+
+#define IOMAN_NUMBUFFER 1
+#define IOMAN_NUMITERATIONS 3
+#define IOMAN_DO_MEMALLOC
+
+#define CLUSTER_PREALLOC_FILE 5
+#define CLUSTER_PREALLOC_DIRECTORY 2
+
+#define LITTLE_ENDIAN
+
+/* #define DATE_TIME_SUPPORT */
+
+// #define FULL_ERROR_SUPPORT
+#define BASE_ERROR_SUPPORT
+
+/*#define DEBUG*/
+/*#define DO_FUNC_DEBUG*/
+
+#define LIST_MAXLENFILENAME 12
+
+#endif

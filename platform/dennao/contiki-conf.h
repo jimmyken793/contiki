@@ -121,7 +121,6 @@
 #define SCK            PB1  /* - Output: SPI Serial Clock (SCLK) - ATMEGA128 PORTB, PIN1 */
 #define MOSI           PB2  /* - Output: SPI Master out - slave in (MOSI) - ATMEGA128 PORTB, PIN2 */
 #define MISO           PB3  /* - Input:  SPI Master in - slave out (MISO) - ATMEGA128 PORTB, PIN3 */
-#define CSN            PB0
 
 #if WITH_UIP6
 
@@ -143,7 +142,7 @@
 
 #define NETSTACK_CONF_NETWORK uip_driver
 #define NETSTACK_CONF_MAC     ethernet_mac_driver
-#define NETSTACK_CONF_RDC     nullrdc_noframer_driver
+#define NETSTACK_CONF_RDC     ethernet_rdc_driver
 #define NETSTACK_CONF_FRAMER  framer_ethernet
 #define NETSTACK_CONF_RADIO   mrf24wb0ma_driver
 
@@ -160,15 +159,9 @@
 #define CONTIKIMAC_CONF_ANNOUNCEMENTS    0
 #define CONTIKIMAC_CONF_COMPOWER         1
 
-#define COLLECT_NEIGHBOR_CONF_MAX_NEIGHBORS      32
-
 #endif /* WITH_UIP6 */
 
 #define PACKETBUF_CONF_ATTRS_INLINE 1
-
-#ifndef RF_CHANNEL
-#define RF_CHANNEL              26
-#endif /* RF_CHANNEL */
 
 #define CONTIKIMAC_CONF_BROADCAST_RATE_LIMIT 0
 
@@ -210,7 +203,7 @@
 #define UIP_CONF_ND6_MAX_NEIGHBORS      4
 #define UIP_CONF_ND6_MAX_DEFROUTERS     2
 #define UIP_CONF_IP_FORWARD             0
-#define UIP_CONF_BUFFER_SIZE		    1000
+#define UIP_CONF_BUFFER_SIZE		    UIP_LINK_MTU + UIP_LLH_LEN + 4
 
 #define SICSLOWPAN_CONF_COMPRESSION_IPV6        0
 #define SICSLOWPAN_CONF_COMPRESSION_HC1         1
@@ -226,14 +219,12 @@
 
 #define UIP_CONF_IPV6            0
 #define UIP_CONF_IP_FORWARD      0
-#define UIP_CONF_BUFFER_SIZE     1000
+#define UIP_CONF_BUFFER_SIZE     UIP_LINK_MTU + UIP_LLH_LEN + 4
 #endif /* WITH_UIP6 */
 
 #define UIP_CONF_ICMP_DEST_UNREACH 1
 
 #define TIMESYNCH_CONF_ENABLED 1
-#define CC2420_CONF_TIMESTAMPS 1
-#define CC2420_CONF_SYMBOL_LOOP_COUNT 500
 #define PACKETBUF_CONF_SIZE 1000
 
 #define WITH_NULLMAC 0
@@ -242,7 +233,7 @@
 #define CLIF
 
 /* The process names are not used to save RAM */
-#define PROCESS_CONF_NO_PROCESS_NAMES 0
+#define PROCESS_CONF_NO_PROCESS_NAMES 1
 
 #define UIP_CONF_ICMP_DEST_UNREACH 1
 
@@ -267,10 +258,5 @@
 typedef unsigned short clock_time_t;
 typedef unsigned short uip_stats_t;
 typedef unsigned long off_t;
-
-void clock_delay(unsigned int us2);
-// void clock_wait(int ms10);
-void clock_set_seconds(unsigned long s);
-unsigned long clock_seconds(void);
 
 #endif /* __CONTIKI_CONF_H__ */

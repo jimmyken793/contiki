@@ -40,29 +40,20 @@
  * 
  */
 unsigned char spi_busy = 0;
+unsigned char spi_inited = 0;
 
 /*
  * Initialize SPI bus.
  */
-void
-spi_init(void)
-{
-  /* Initalize ports for communication with SPI units. */
-  /* CSN=SS and must be output when master! */
-  
-  PRR0 = 0x00;
-  DDRB |= BV(MOSI) | BV(SCK) | BV(CSN);
-  DDRB &= ~BV(MISO);
-  PORTB |= BV(CSN);
-
-  /* Enables SPI, selects "master", clock rate FCK / 2, and SPI mode 0 */
-  SPCR |= BV(SPE) | BV(MSTR);
-  SPSR = BV(SPI2X);
-
-// PRR0 = 0x00;\
-// DDRB  |= SPI0_SS_BIT|SPI0_SCLK_BIT|SPI0_MOSI_BIT|LEDConn_BIT;\
-// DDRB  &= ~SPI0_MISO_BIT;\
-// PORTB = SPI0_SS_BIT;\
-// SPCR  = 0x50;\
-// SPSR  = 0x01
+void spi_init(void){
+	if(!spi_inited){
+		/* Initalize ports for communication with SPI units. */
+		/* CSN=SS and must be output when master! */
+		DDRB |= BV(MOSI) | BV(SCK);
+		DDRB &= ~BV(MISO);
+		/* Enables SPI, selects "master", clock rate FCK / 2, and SPI mode 0 */
+		SPCR |= BV(SPE) | BV(MSTR) | BV(SPR1) | BV(SPR0);
+		//SPSR = BV(SPI2X);
+		spi_inited = 1;
+	}
 }
