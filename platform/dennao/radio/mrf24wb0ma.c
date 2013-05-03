@@ -77,11 +77,11 @@
 #include "dennao_interrupt.h"
 #include "process.h"
 
-#define DEBUG
-#ifdef DEBUG
-#define DEBUG_PRINT(...) printf(__VA_ARGS__)
+#define DEBUG 0
+#if DEBUG
+#define PRINTF(FORMAT,args...) printf_P(PSTR(FORMAT),##args)
 #else
-#define DEBUG_PRINT(...)
+#define PRINTF(...)
 #endif
 
 static uint8_t mac[6];
@@ -234,7 +234,7 @@ uint8_t wifi_read_8bit_register(uint8_t reg){
 
 int MRF24WB0MA_init(void){
 
-  printf_P(PSTR("MRF24WB0MA_init\n"));
+  PRINTF("MRF24WB0MA_init\n");
   /* Initialize Wifi Module */
   uint8_t clr;
   spi_init();
@@ -266,13 +266,13 @@ int MRF24WB0MA_init(void){
   drv_register_interrupt(WF_HOST_INT_MASK_FIFO_1_THRESHOLD | WF_HOST_INT_MASK_FIFO_0_THRESHOLD | WF_HOST_INT_MASK_RAW_0_INT_0 | WF_HOST_INT_MASK_RAW_1_INT_0 , WF_INT_ENABLE);
   attachInterrupt(2, zg_isr, 0);
   drv_request_mac();
-  printf_P(PSTR("MRF24WB0MA_init done!\n"));
+  PRINTF("MRF24WB0MA_init done!\n");
   return 1;
 }
 /*---------------------------------------------------------------------------*/
 
 static int MRF24WB0MA_transmit(unsigned short payload_len){
-  printf_P(PSTR("wifi transmit\n"));
+  PRINTF("wifi transmit\n");
   tx_ready = 1;
   process_poll(&mrf24wb0ma_process);
   return RADIO_TX_OK;
@@ -355,11 +355,11 @@ void wifi_connect(){
   NETSTACK_RDC.init();
   NETSTACK_MAC.init();
   NETSTACK_NETWORK.init();
-  printf("waiting for wifi connection...\n");
+  printf_P(PSTR("waiting for wifi connection...\n"));
   while(wifi_is_connected() != 1) {
     drv_process();
   }
-  printf("wifi connection established\n");
+  printf_P(PSTR("wifi connection established\n"));
   process_start(&mrf24wb0ma_process,NULL);
   struct uip_eth_addr addr;
   wifi_getMAC(addr.addr);
@@ -444,7 +444,6 @@ static void zg_write_psk_key(uint8_t* cmd_buf){
 
 PROCESS_THREAD(mrf24wb0ma_process, ev, data){
   PROCESS_BEGIN();
-    DEBUG_PRINT("process started!\n");
   while(1) {
     PROCESS_WAIT_EVENT();
     drv_process();
@@ -469,7 +468,7 @@ void drv_start_connection(){
   cmd->ssidLen = ssid_len;
   memcpy(cmd->ssid, ssid, ssid_len);
   memset(cmd->ssid + ssid_len, 0, ZG_MAX_SSID_LENGTH - ssid_len);
-  DEBUG_PRINT("Connecting with SSID: %s\n", cmd->ssid);
+  PRINTF("Connecting with SSID: %s\n", cmd->ssid);
 
   // units of 100 milliseconds
   cmd->sleepDuration = 0;
@@ -639,7 +638,7 @@ void drv_process(){
   if (intr_valid) {
     switch (drv_buf[1]) {
     case ZG_MAC_TYPE_TXDATA_CONFIRM:
-      DEBUG_PRINT("Tx Confirm!\n");
+      PRINTF("Tx Confirm!\n");
       tx_confirm_pending = 0;
       break;
     case ZG_MAC_TYPE_MGMT_CONFIRM:
@@ -666,12 +665,12 @@ void drv_process(){
           zg_conn_status = 1;
           break;
         default:
-          DEBUG_PRINT("Unknown MAC subtype %d\n", drv_buf[2]);
+          PRINTF("Unknown MAC subtype %d\n", drv_buf[2]);
           break;
         }
       }else{
         drv_request_mac();
-        DEBUG_PRINT("request failed!\n");
+        PRINTF("request failed!\n");
       }
       break;
     case ZG_MAC_TYPE_RXDATA_INDICATE:
@@ -681,7 +680,7 @@ void drv_process(){
       switch (drv_buf[2]) {
       case ZG_MAC_SUBTYPE_MGMT_IND_DISASSOC:
       case ZG_MAC_SUBTYPE_MGMT_IND_DEAUTH:
-        DEBUG_PRINT("Wifi Disconnected!\n");
+        PRINTF("Wifi Disconnected!\n");
         zg_conn_status = 0;
         drv_start_connection();
         break;
@@ -689,7 +688,7 @@ void drv_process(){
         {
           uint16_t status = (((uint16_t)(drv_buf[3]))<<8)|drv_buf[4];
           if(status == 1 || status == 5){
-            DEBUG_PRINT("Wifi Disconnected!\n");
+            PRINTF("Wifi Disconnected!\n");
             zg_conn_status = 0;
           }else if(status == 2 || status == 6) {
             zg_conn_status = 1;

@@ -114,7 +114,7 @@ static uint8_t tmpage;
 #define BUF   ((struct arp_hdr *)&uip_buf[0])
 #define IPBUF ((struct ethip_hdr *)&uip_buf[0])
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
