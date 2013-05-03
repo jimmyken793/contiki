@@ -1,44 +1,3 @@
-/*
- * Copyright (c) 2007, Swedish Institute of Computer Science
- * All rights reserved.
- *
- *  Additional fixes for AVR contributed by:
- *
- *  David Kopf dak664@embarqmail.com
- *  Ivan Delamer delamer@ieee.com
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the Institute nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * This file is part of the Contiki operating system.
- *
- */
-/*
- * This code is almost device independent and should be easy to port.
- * Ported to Atmel RF230 21Feb2010 by dak
- */
-
 #include <stdio.h>
 #include <string.h>
 
@@ -46,13 +5,6 @@
 
 #if defined(__AVR__)
 #include <avr/io.h>
-
-//_delay_us has the potential to use floating point which brings the 256 byte clz table into RAM
-//#include <util/delay.h>
-//#define delay_us( us )   ( _delay_us( ( us ) ) )
-//_delay_loop_2(uint16_t count) is 4 CPU cycles per iteration, up to 32 milliseconds at 8MHz
-#include <util/delay_basic.h>
-#define delay_us( us )   ( _delay_loop_2(1+((unsigned long long)us*F_CPU)/4000000UL) ) 
 
 #include <avr/pgmspace.h>
 #elif defined(__MSP430__)
@@ -157,14 +109,14 @@ const struct radio_driver mrf24wb0ma_driver =
     MRF24WB0MA_off
   };
 void drv_spi_transfer(volatile uint8_t* buf, uint16_t len, uint8_t toggle_cs){
-  WIFI_SS_OFF();
+  WIFI_SS_ON();
   static uint16_t i;
   for (i = 0; i < len; i++) {
     SPI_WRITE(buf[i]);
     SPI_READ(buf[i]);
   }
   if (toggle_cs){
-    WIFI_SS_ON();
+    WIFI_SS_OFF();
   }
   return;
 }
@@ -237,7 +189,12 @@ int MRF24WB0MA_init(void){
   PRINTF("MRF24WB0MA_init\n");
   /* Initialize Wifi Module */
   uint8_t clr;
+
+  DDRB |= BV(WIFI_CSN);
+  PORTB |= BV(WIFI_CSN);
+
   spi_init();
+
   clr = SPSR;
   clr = SPDR;
 

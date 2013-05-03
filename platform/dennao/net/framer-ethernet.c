@@ -50,44 +50,39 @@
 #define PRINTF(...)
 #define PRINTADDR(addr)
 #endif
-static const struct uip_eth_addr broadcast_ethaddr =
-  {{0xff,0xff,0xff,0xff,0xff,0xff}};
+static const struct uip_eth_addr broadcast_ethaddr = {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}};
 /*---------------------------------------------------------------------------*/
-static int
-create(void)
-{
-  struct uip_eth_hdr *hdr;
+static int create(void) {
+	struct uip_eth_hdr *hdr;
 
-  if(packetbuf_hdralloc(sizeof(struct uip_eth_hdr))) {
-    hdr = packetbuf_hdrptr();
-    memcpy(&(hdr->src), &uip_lladdr, 6);
-    memcpy(&(hdr->dest), &broadcast_ethaddr, 6);
-    hdr->type = 0x08;
-    return sizeof(struct uip_eth_hdr);
-  }
-  PRINTF("PNULLMAC-UT: too large header: %u\n", len);
-  return FRAMER_FAILED;
+	if (packetbuf_hdralloc(sizeof(struct uip_eth_hdr))) {
+		hdr = packetbuf_hdrptr();
+		memcpy(&(hdr->src), &uip_lladdr, 6);
+		memcpy(&(hdr->dest), &broadcast_ethaddr, 6);
+		hdr->type = 0x08;
+		return sizeof(struct uip_eth_hdr);
+	}
+	PRINTF("PNULLMAC-UT: too large header: %u\n", len);
+	return FRAMER_FAILED;
 }
 /*---------------------------------------------------------------------------*/
-static int
-parse(void)
-{
-  struct uip_eth_hdr *hdr;
-  hdr = packetbuf_dataptr();
-  if(packetbuf_hdrreduce(sizeof(struct uip_eth_hdr))) {
-    packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &(hdr->src));
-    packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &(hdr->dest));
+static int parse(void) {
+	struct uip_eth_hdr *hdr;
+	hdr = packetbuf_dataptr();
+	if (packetbuf_hdrreduce(sizeof(struct uip_eth_hdr))) {
+		packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &(hdr->src));
+		packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &(hdr->dest));
 
-    PRINTF("PNULLMAC-IN: ");
-    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER));
-    PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
-    PRINTF("%u (%u)\n", packetbuf_datalen(), len);
+		PRINTF("PNULLMAC-IN: ");
+		PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER));
+		PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
+		PRINTF("%u (%u)\n", packetbuf_datalen(), len);
 
-    return sizeof(struct uip_eth_hdr);
-  }
-  return FRAMER_FAILED;
+		return sizeof(struct uip_eth_hdr);
+	}
+	return FRAMER_FAILED;
 }
 /*---------------------------------------------------------------------------*/
 const struct framer framer_ethernet = {
-  create, parse
+	create, parse
 };

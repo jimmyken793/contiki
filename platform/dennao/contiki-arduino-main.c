@@ -40,7 +40,7 @@
 #include "loader/symbols-def.h"
 #include "loader/symtab.h"
 #include <stdbool.h>
- 
+
 #include "contiki.h"
 #include "contiki-net.h"
 #include "contiki-lib.h"
@@ -53,67 +53,48 @@
 #include "contiki-conf.h"
 #include "dhcp.h"
 #include "net/uip-driver.h"
-
-#if 0
-FUSES =
-	{
-		.low = 0xe2,
-		.high = 0x99,
-		.extended = 0xff,
-	};
-	
-
-/* Put default MAC address in EEPROM */
-uint8_t mac_address[8] EEMEM = {0x02, 0x11, 0x22, 0xff, 0xfe, 0x33, 0x44, 0x55};
-#endif
+#include "sd-spi.h"
 
 PROCINIT(&etimer_process, &serial_line_process);
 
 void
-init_lowlevel(void)
-{
-  rs232_init(USART_PORT, USART_BAUD, USART_PARITY_NONE | USART_STOP_BITS_1 | USART_DATA_BITS_8);
-  rs232_redirect_stdout(USART_PORT);
-  rs232_set_input(USART_PORT, serial_line_input_byte);
+init_lowlevel(void) {
+	rs232_init(USART_PORT, USART_BAUD, USART_PARITY_NONE | USART_STOP_BITS_1 | USART_DATA_BITS_8);
+	rs232_redirect_stdout(USART_PORT);
+	rs232_set_input(USART_PORT, serial_line_input_byte);
 }
 
 
-int main(void)
-{
-  //calibrate_rc_osc_32k(); //CO: Had to comment this out
-  /* Initialize hardware */
-  init_lowlevel();
-  /* Clock */
-  clock_init();
+int main(void) {
+	//calibrate_rc_osc_32k(); //CO: Had to comment this out
+	/* Initialize hardware */
+	init_lowlevel();
+	/* Clock */
+	clock_init();
 
-  /* Process subsystem */
-  process_init();
+	/* Process subsystem */
+	process_init();
 
-  /* Register initial processes */
-  procinit_init();
+	/* Register initial processes */
+	procinit_init();
 
-  //Give ourselves a prefix
-  //init_net();
+	/* System timers */
+	process_start(&etimer_process, NULL);
+	ctimer_init();
 
-    /* System timers */
-  process_start(&etimer_process, NULL);
-  ctimer_init();
+	serial_line_init();
+  printf_P(PSTR("\n*******Booting %s*******\n"),CONTIKI_VERSION_STRING);
 
-  /* This line wasn't present in ProMini code */
-  /* Make pin 5 on port B an input (PB5 SCK/PCINT5) */
-  PORTB &= ~(1<<5);
-  serial_line_init();
-  printf_P(PSTR("\r\n********BOOTING CONTIKI*********\r\n"));
 	efs_sdcard_init();
 
-  autostart_start(autostart_processes);
-  printf_P(PSTR("System online.\r\n"));
-  watchdog_start();
-  do {
-    process_run();
-    watchdog_periodic();
-    etimer_request_poll();
-  } while (1);
+	autostart_start(autostart_processes);
+	printf_P(PSTR("System online.\r\n"));
+	watchdog_start();
+	do {
+		process_run();
+		watchdog_periodic();
+		etimer_request_poll();
+	} while (1);
 
-  return 0;
+	return 0;
 }

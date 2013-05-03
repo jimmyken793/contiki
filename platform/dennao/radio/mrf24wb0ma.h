@@ -59,6 +59,8 @@
 #include "sys/process.h"
 #include "net/netstack.h"
 
+#define WIFI_CSN            PB0
+
 #define RADIO_BUFFER_LEN 1000
 
 #include <stdint.h>
@@ -138,8 +140,8 @@ PROCESS_NAME(mrf24wb0ma_process);
 #define WIFI_ISR_DISABLE() (EIMSK &= ~(0x01))
 #define WIFI_ISR_ENABLE() (EIMSK |= 0x01)
 
-#define WIFI_SS_ON() (PORTB |= BV(CSN))
-#define WIFI_SS_OFF() (PORTB &= ~BV(CSN))
+#define WIFI_SS_ON() (PORTB &= ~BV(WIFI_CSN))
+#define WIFI_SS_OFF() (PORTB |= BV(WIFI_CSN))
 
 //Host to Zero G long
 #define HTOZGL(a) ( ((a & 0x000000ff)<<24) \
